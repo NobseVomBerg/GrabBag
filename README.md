@@ -17,5 +17,5 @@ und lass sie das Setup anpassen. Wie genau, steht in der Setup-Datei.
 
 ## Lizenz
 
-[MIT-0](LICENSE): Kopieren, ändern, weitergeben — alles erlaubt, auch
-ohne Namensnennung. Ohne Gewähr.
+[MIT](LICENSE): Kopieren, ändern, weitergeben — alles erlaubt, solange
+der Copyright- und Lizenzhinweis mitkommt. Ohne Gewähr.
