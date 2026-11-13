@@ -3,10 +3,10 @@
 Für zwei Sungrow SH-RT mit Akku an einem Hausanschluss: WR1 hat den Netzzähler, WR2 nicht.
 Die Modbus-Sensoren liefern alles je Wechselrichter; diese Templates machen daraus Werte für die ganze Anlage.
 
-<img src="bilder/energiefluss_nacht.png" width="420" alt="Energiefluss-Karte: Netz, PV, Akku, Haus und Wallbox">
+<img src="bilder/energiefluss.png" width="420" alt="Energiefluss-Karte: Netz, PV, Akku, Haus und Wallbox">
 
-*Energiefluss-Karte nachts: Das Haus läuft aus dem Netz, PV und Akku stehen. Tagsüber fließt es entsprechend
-von der PV ins Haus, in den Akku und ins Netz.*
+*Energiefluss-Karte beim Autoladen: 19 kW aus dem Netz und 2,7 kW von der PV fließen ins Haus, davon 9,8 kW über
+die Wallbox ins Auto. Der Akku steht. Bei PV-Überschuss fließt es entsprechend in den Akku und ins Netz.*
 
 ## Dateien
 
