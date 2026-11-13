@@ -1,7 +1,7 @@
 # Dashboard-Karte "Strompreis effektiv" - in der UI: Karte hinzufügen -> Manuell, diesen Inhalt einfügen.
 # Aus https://github.com/NobseVomBerg/GrabBag - MIT-Lizenz, ohne Gewähr.
-# Braucht helfer_strompreis_effektiv.yaml. Die Schwelle 0,343 €/kWh ist mein Vergleich mit einem Festpreis-
-# angebot (32,8 ct + Grundpreis-Unterschied): eigenen Wert in Untertitel und Tacho-Segment eintragen.
+# Braucht helfer_strompreis_effektiv.yaml. Die Schwelle 0,343 €/kWh ist ein Beispiel (Vergleich mit einem
+# Festpreisangebot: 32,8 ct + Grundpreis-Unterschied). Eigenen Wert in Untertitel und Tacho-Segment eintragen.
 # sensor.DEIN_ZUHAUSE_electricity_price heißt bei dir anders: der Preissensor der Tibber-Integration.
 
 type: vertical-stack

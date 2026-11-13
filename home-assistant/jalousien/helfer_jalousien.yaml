@@ -6,7 +6,7 @@
 # Grad unter dem Horizont: 0 = Sonnenuntergang, -6 = Ende der bürgerlichen Dämmerung.
 
 input_number:
-  jalousie_buro_2_zu_bei_sonnenstand:     # bei mir -2
+  jalousie_buro_2_zu_bei_sonnenstand:     # z. B. -2
     name: Jalousie Büro 2 zu bei Sonnenstand
     min: -8
     max: 0
@@ -14,7 +14,7 @@ input_number:
     mode: box
     unit_of_measurement: "°"
     icon: mdi:weather-sunset-down
-  jalousien_zu_bei_sonnenstand:           # Schlafzimmer - bei mir -2,5
+  jalousien_zu_bei_sonnenstand:           # Schlafzimmer - z. B. -2,5
     name: Jalousien zu bei Sonnenstand
     min: -8
     max: 0

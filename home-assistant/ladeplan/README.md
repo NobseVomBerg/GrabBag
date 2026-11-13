@@ -29,7 +29,7 @@ Umgesetzt wird er von den Automationen in [../sungrow-steuerung/automations_prei
 | `pv_historie.py` | `tools/` deines Config-Repos | Erzeugt `pv_historie.jinja` aus der Langzeitstatistik; braucht [../ha-config-git/sync_from_ha.py](../ha-config-git/) |
 | `energie_automatik.yaml` | Package | `sensor.netzladeplan`, PV-Prognose-Faktor, Autoladeleistung, Akku-Schutz |
 | `tibber.yaml` | Package | `sensor.tibber_preise` mit den Viertelstundenpreisen (Aktion `tibber.get_prices`) |
-| `helfer_ladeplan.yaml` | Package | Grenzwerte, Saison und die Statistik-Sensoren (bei mir UI-Helfer) |
+| `helfer_ladeplan.yaml` | Package | Grenzwerte, Saison und die Statistik-Sensoren (auch als UI-Helfer möglich) |
 | `helfer_strompreis_effektiv.yaml` + `karte_strompreis_effektiv.yaml` | Package + Dashboard | Effektiver Bezugspreis je Monat und Jahr, Tacho mit Festpreis-Schwelle |
 | `karte_preis_automatik.yaml` | Dashboard | Die Karte „Preis-Automatik" aus dem ersten Bild (Einstellungen und Begründung des Plans) |
 
@@ -37,10 +37,11 @@ Umgesetzt wird er von den Automationen in [../sungrow-steuerung/automations_prei
 
 - Tibber-Integration und Forecast.Solar; zwei Sungrow-Akkus mit den Sensoren aus [../sungrow-modbus/](../sungrow-modbus/)
   und den Summen aus [../zwei-wechselrichter/](../zwei-wechselrichter/). Mit einem Wechselrichter die WR2-Teile entfernen.
-- **Autos:** `sensor.autoladeleistung` kennt meine Wallbox und zwei Autos über deren Integration
+- **Autos:** `sensor.autoladeleistung` kennt eine Wallbox und zwei Autos über deren Integration
   (Platzhalter `auto_1`, `auto_2`). Eigene Wallbox bzw. Fahrzeuge eintragen; ohne Auto einfach `0`.
 - Akkugröße kommt aus den Modbus-Sensoren (Kapazität, Min-/Max-SoC, Backup-Reserve), Wirkungsgrad `eta = 0.9` im Makro.
-- Das PV-Fenster (Sonnenaufgang + 2 h bis Sonnenuntergang − 2,5 h) ist auf meine Verschattung eingestellt.
+- Das PV-Fenster (Sonnenaufgang + 2 h bis Sonnenuntergang − 2,5 h) hängt von der Verschattung ab und ist
+  an die eigene Anlage anzupassen.
 - Testen: Das Makro nimmt Testwerte für SoC, PV-Rest, Verbrauch, Uhrzeit und PV-Leistung an, z. B. in den
   Entwicklerwerkzeugen: `{% from 'netzladeplan.jinja' import ladeplan %}{{ ladeplan(30, 5, none, '2026-11-11T04:00:00+01:00', 0) }}`.
 

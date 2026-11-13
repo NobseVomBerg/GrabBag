@@ -1,12 +1,12 @@
 # Sungrow: Helfer und Template-Sensoren für automations_sungrow.yaml und automations_preis_automatik.yaml
 # Aus https://github.com/NobseVomBerg/GrabBag - MIT-Lizenz, ohne Gewähr. Entity-IDs an die eigene Anlage anpassen.
 #
-# Bei mir sind das UI-Helfer. Hier stehen sie als Package, damit man sie in einem Rutsch bekommt:
+# Die Helfer stehen hier als Package, damit man sie in einem Rutsch bekommt:
 #   configuration.yaml:  homeassistant:
 #                          packages: !include_dir_named packages
 #   diese Datei nach packages/ legen. Alternativ in der UI mit denselben Namen anlegen (die
 #   Entity-IDs ergeben sich aus den Namen bzw. den Schlüsseln unten).
-# Die Werte in den Kommentaren sind meine Einstellungen (zwei Sungrow SH10RT).
+# Die Werte in den Kommentaren sind Beispielwerte aus dem Betrieb (zwei Sungrow SH10RT).
 
 input_boolean:
   # Merker: wer hat Laden/Halten ausgelöst? Die Automationen beenden nur, was sie selbst gestartet haben.
@@ -31,7 +31,7 @@ input_boolean:
     icon: mdi:solar-power-variant
 
 input_number:
-  ladebudget_gesamt:          # Netzbezug gesamt beim Zwangsladen, inkl. Haus und Auto - bei mir 18000 W
+  ladebudget_gesamt:          # Netzbezug gesamt beim Zwangsladen, inkl. Haus und Auto - z. B. 18000 W
     name: Ladebudget gesamt
     min: 3000
     max: 20000
@@ -39,7 +39,7 @@ input_number:
     mode: box
     unit_of_measurement: W
     icon: mdi:transmission-tower-import
-  netz_phasengrenze:          # höchster Strom je Phase am Netzzähler - bei mir 25 A
+  netz_phasengrenze:          # höchster Strom je Phase am Netzzähler - z. B. 25 A
     name: Netz Phasengrenze
     min: 16
     max: 32
@@ -47,7 +47,7 @@ input_number:
     mode: box
     unit_of_measurement: A
     icon: mdi:fuse
-  zwangsladen_leistung:       # höchste Ladeleistung je Akku - bei mir 8000 W
+  zwangsladen_leistung:       # höchste Ladeleistung je Akku - z. B. 8000 W
     name: Zwangsladen Leistung
     min: 500
     max: 10600
@@ -63,7 +63,7 @@ input_number:
     mode: box
     unit_of_measurement: "%"
     icon: mdi:battery-arrow-up
-  backup_reserve_wr1:         # Notstrom-Reserve von WR1 (Register 13100) - bei mir 10 %
+  backup_reserve_wr1:         # Notstrom-Reserve von WR1 (Register 13100) - z. B. 10 %
     name: Backup-Reserve WR1
     min: 0
     max: 100

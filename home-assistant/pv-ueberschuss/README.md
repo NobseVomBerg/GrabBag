@@ -1,6 +1,6 @@
 # PV-Überschuss: Steckdose zuschalten
 
-Zwei Automationen schalten eine Steckdose (bei mir „Prio 2", z. B. für einen Heizlüfter oder Akkulader) bei
+Zwei Automationen schalten eine Steckdose (hier „Prio 2" genannt, z. B. für einen Heizlüfter oder Akkulader) bei
 PV-Überschuss ein und wieder aus:
 
 - **an**, wenn die PV-Leistung (DC) 5 Minuten lang mehr als **2,5 kW** über dem Hausverbrauch ohne Wallbox liegt

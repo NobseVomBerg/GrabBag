@@ -33,7 +33,7 @@ einfügen. Dann bleiben sie in der UI editierbar. Helfer als Package einbinden
 
 ## Ordnung in Home Assistant: Kategorien statt vieler Dateien
 
-Hier sind die Automationen nach Themen auf Dateien verteilt. In der eigenen Installation lasse ich sie in der einen
+Hier sind die Automationen nach Themen auf Dateien verteilt. In der eigenen Installation bleiben sie besser in der einen
 `automations.yaml`: Nur die kann der UI-Editor bearbeiten. Ordnung schaffen dort **Kategorien**
 (Einstellungen → Automationen, „Gruppieren nach Kategorie").
 

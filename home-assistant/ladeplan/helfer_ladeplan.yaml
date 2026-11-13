@@ -1,12 +1,12 @@
 # Ladeplan: Helfer und Statistik-Sensoren für netzladeplan.jinja und energie_automatik.yaml (Package)
 # Aus https://github.com/NobseVomBerg/GrabBag - MIT-Lizenz, ohne Gewähr. Entity-IDs an die eigene Anlage anpassen.
 #
-# Bei mir sind das UI-Helfer. Als Package einbinden (configuration.yaml: homeassistant: packages:
-# !include_dir_named packages, Datei nach packages/) oder in der UI mit denselben Namen anlegen.
-# Die Werte in den Kommentaren sind meine Einstellungen.
+# Als Package einbinden (configuration.yaml: homeassistant: packages: !include_dir_named packages,
+# Datei nach packages/) oder in der UI als Helfer mit denselben Namen anlegen.
+# Die Werte in den Kommentaren sind Beispielwerte aus dem Betrieb.
 
 input_number:
-  max_ladepreis_netz:            # teurer wird nie aus dem Netz geladen - bei mir 0,65 €/kWh
+  max_ladepreis_netz:            # teurer wird nie aus dem Netz geladen - z. B. 0,65 €/kWh
     name: Max. Ladepreis Netz
     min: 0.05
     max: 1
@@ -14,7 +14,7 @@ input_number:
     mode: box
     unit_of_measurement: "€/kWh"
     icon: mdi:cash-lock
-  mindestvorteil_netzladen:      # Laden lohnt erst ab diesem Abstand (nach Verlusten) - bei mir 0,05 €/kWh
+  mindestvorteil_netzladen:      # Laden lohnt erst ab diesem Abstand (nach Verlusten) - z. B. 0,05 €/kWh
     name: Mindestvorteil Netzladen
     min: 0
     max: 0.2
@@ -22,7 +22,7 @@ input_number:
     mode: box
     unit_of_measurement: "€/kWh"
     icon: mdi:scale-balance
-  hausverbrauch_pro_tag:         # Rückfallwert, solange es noch keinen Durchschnitt gibt - bei mir 17 kWh
+  hausverbrauch_pro_tag:         # Rückfallwert, solange es noch keinen Durchschnitt gibt - z. B. 17 kWh
     name: Hausverbrauch pro Tag
     min: 5
     max: 40
@@ -30,7 +30,7 @@ input_number:
     mode: box
     unit_of_measurement: kWh
     icon: mdi:home-lightning-bolt
-  akku_schutz_min_soc:           # Akku-Schutz beim Autoladen greift unter diesem SoC - bei mir 50 %
+  akku_schutz_min_soc:           # Akku-Schutz beim Autoladen greift unter diesem SoC - z. B. 50 %
     name: Akku-Schutz Min-SoC
     min: 10
     max: 100
@@ -38,7 +38,7 @@ input_number:
     mode: box
     unit_of_measurement: "%"
     icon: mdi:battery-heart-variant
-  akku_schutz_ziel_aus_pv:       # ... außer die PV bringt den Akku heute noch hierhin - bei mir 60 %
+  akku_schutz_ziel_aus_pv:       # ... außer die PV bringt den Akku heute noch hierhin - z. B. 60 %
     name: Akku-Schutz Ziel aus PV
     min: 10
     max: 100

@@ -6,7 +6,7 @@
 #   sensor.sum_daily_imported_energy_cost Kostensensor, den das Energie-Dashboard selbst anlegt, wenn beim
 #                                         Netzbezug "Entität mit aktuellem Preis" (Tibber-Preis) gewählt ist.
 #                                         Der Name hängt an deinem Bezugssensor: <bezugssensor>_cost.
-# Bei mir sind das UI-Helfer (Verbrauchszähler + Template). Der Zähler "Stromjahr" setzt nie zurück:
+# Lässt sich auch als UI-Helfer anlegen (Verbrauchszähler + Template). Der Zähler "Stromjahr" setzt nie zurück:
 # nach 12 Monaten auswerten und dann per Aktion utility_meter.calibrate auf 0 setzen.
 
 utility_meter:
