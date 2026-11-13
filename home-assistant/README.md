@@ -1,7 +1,8 @@
-# Home Assistant: Vorlagen aus meiner Installation
+# Home Assistant: Vorlagen
 
-Ausschnitte aus einer echten Home-Assistant-Installation (Core 2026.10) zum Abschauen und Anpassen.
-Nichts davon läuft ohne Anpassung: Entity-IDs, Geräte und Grenzwerte sind die meiner Anlage.
+Vorlagen für Home Assistant zum Übernehmen und Anpassen, entstanden im laufenden Betrieb (Stand: Core 2026.10).
+Teile davon laufen in mehreren Installationen. Vor dem Einsatz die Entity-IDs auf die eigenen Geräte umstellen
+und die Grenzwerte an die eigene Anlage anpassen.
 
 ## Inhalt
 
