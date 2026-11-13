@@ -1,0 +1,16 @@
+# Templates to calculate some additional Things for the Wallbox
+# Written by https://github.com/NobseVomBerg/
+# Last update 20240508
+# sensor.wallbox_phase_* are placeholders: use the current and voltage entities of your own wallbox.
+
+template:
+  - sensor:
+    # 0 W whenever the wallbox does not deliver values (e.g. WiFi drop-out)
+      - name: "Wallbox Load Power"
+        unit_of_measurement: W
+        device_class: power
+        state: >
+          {{ (states('sensor.wallbox_phase_a_current')|float(0) * states('sensor.wallbox_phase_a_voltage')|float(0)
+            + states('sensor.wallbox_phase_b_current')|float(0) * states('sensor.wallbox_phase_b_voltage')|float(0)
+            + states('sensor.wallbox_phase_c_current')|float(0) * states('sensor.wallbox_phase_c_voltage')|float(0)
+            ) | round(0) | int }}

@@ -1,0 +1,24 @@
+# Jalousien: Sonnenstand, bei dem die Jalousien zufahren (automations_jalousien.yaml)
+# Aus https://github.com/NobseVomBerg/GrabBag - MIT-Lizenz, ohne Gewähr.
+#
+# Als Package einbinden (configuration.yaml: homeassistant: packages: !include_dir_named packages,
+# Datei nach packages/) oder in der UI als Zahlen-Helfer mit denselben Namen anlegen.
+# Grad unter dem Horizont: 0 = Sonnenuntergang, -6 = Ende der bürgerlichen Dämmerung.
+
+input_number:
+  jalousie_buro_2_zu_bei_sonnenstand:     # bei mir -2
+    name: Jalousie Büro 2 zu bei Sonnenstand
+    min: -8
+    max: 0
+    step: 0.5
+    mode: box
+    unit_of_measurement: "°"
+    icon: mdi:weather-sunset-down
+  jalousien_zu_bei_sonnenstand:           # Schlafzimmer - bei mir -2,5
+    name: Jalousien zu bei Sonnenstand
+    min: -8
+    max: 0
+    step: 0.5
+    mode: box
+    unit_of_measurement: "°"
+    icon: mdi:weather-sunset-down

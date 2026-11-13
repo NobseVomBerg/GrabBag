@@ -1,0 +1,115 @@
+# Heizung: einen Raum regeln
+# Aus https://github.com/NobseVomBerg/GrabBag - MIT-Lizenz, ohne Gewähr. Entity-IDs an die eigene Anlage anpassen.
+#
+# Skripte:
+#   - heizung_raum_regeln: Heizkörper auf/zu nach Soll/Ist des Raumthermostats, Fenster offen -> aus
+#
+# Einbinden: in der UI je Skript neu anlegen, "In YAML bearbeiten" und den Inhalt unter dem Schlüssel
+# einfügen (die Skript-ID muss gleich bleiben, die Automationen rufen sie auf). Oder in configuration.yaml:
+#   script heizung: !include scripts_heizung.yaml
+
+heizung_raum_regeln:
+  alias: 'Heizung: Raum regeln'
+  description: 'Regelt einen Heizkörper nach dem Raumthermostat: Soll- und Ist-Temperatur
+    kommen vom Raumthermostat (dessen Wochenprogramm bzw. manueller Sollwert gilt).
+    Heizkörper auf (Heizen mit Soll + 3 °C, max. 26 °C), sobald der Raum 0,3 °C unter
+    Soll liegt; zu (Aus), sobald er 0,1 °C über Soll liegt - dazwischen bleibt der
+    letzte Zustand (Hysterese). Ist ein Fenster oder eine Tür offen oder steht das
+    Raumthermostat auf Aus, ist der Heizkörper immer aus. Sendet nur, wenn sich etwas
+    ändern muss (schont Batterie und Funk). Als ''zu'' gilt auch Heizen mit höchstens
+    5 °C: neuere HmIP-Thermostate (eTRV-B-2) kennen kein Aus und gehen dann auf 5
+    °C (Frostschutz). Optional ''timer'': der 2-h-Timer der manuellen Verstellung
+    (Heizung: Soll nach 2 h zurück aufs Programm) ruht, solange ein Fenster oder eine
+    Tür offen ist, und läuft weiter, wenn alles zu ist - sonst verbraucht das Lüften
+    die 2 h (12.11.2026: 22,5 °C bei offener Küche eingestellt, nach dem Schließen
+    blieben nur 44 min).'
+  mode: parallel
+  max: 4
+  icon: mdi:radiator
+  fields:
+    thermostat:
+      name: Raumthermostat
+      required: true
+      selector:
+        entity:
+          domain: climate
+    heizkoerper:
+      name: Heizkörper
+      required: true
+      selector:
+        entity:
+          domain: climate
+    fenster:
+      name: Fenster und Türen
+      required: true
+      selector:
+        entity:
+          domain: binary_sensor
+          multiple: true
+    timer:
+      name: 2-h-Timer der manuellen Verstellung
+      required: false
+      selector:
+        entity:
+          domain: timer
+  sequence:
+  - variables:
+      ist: '{{ state_attr(thermostat, ''current_temperature'') }}'
+      soll: '{{ state_attr(thermostat, ''temperature'') | float(0) }}'
+      offen: '{{ fenster | select(''is_state'', ''on'') | list | count > 0 }}'
+      hk_soll: '{{ state_attr(heizkoerper, ''temperature'') | float(0) }}'
+      hk_heizt: '{{ is_state(heizkoerper, ''heat'') and hk_soll > 5 }}'
+      hk_ziel: '{{ [soll + 3, 26] | min }}'
+      heizen: '{{ false if (offen or is_state(thermostat, ''off'') or soll <= 5) else
+        (true if ist | float(99) <= soll - 0.3 else (false if ist | float(-99) >=
+        soll + 0.1 else hk_heizt)) }}'
+      hk_zu: '{{ is_state(heizkoerper, ''off'') or (is_state(heizkoerper, ''heat'')
+        and hk_soll <= 5) }}'
+  - alias: 2-h-Timer ruht, solange ein Fenster offen ist
+    if:
+    - condition: template
+      value_template: '{{ timer is defined and timer | length > 0 }}'
+    then:
+    - choose:
+      - alias: 'Fenster offen: Timer anhalten'
+        conditions:
+        - condition: template
+          value_template: '{{ offen and is_state(timer, ''active'') }}'
+        sequence:
+        - action: timer.pause
+          target:
+            entity_id: '{{ timer }}'
+      - alias: 'Alles zu: Timer weiterlaufen lassen'
+        conditions:
+        - condition: template
+          value_template: '{{ not offen and is_state(timer, ''paused'') }}'
+        sequence:
+        - action: timer.start
+          target:
+            entity_id: '{{ timer }}'
+  - alias: Ohne gültige Raumtemperatur nichts ändern (außer Fenster offen)
+    condition: template
+    value_template: '{{ offen or is_number(ist) }}'
+  - choose:
+    - alias: Heizen
+      conditions:
+      - condition: template
+        value_template: '{{ heizen and not (is_state(heizkoerper, ''heat'') and hk_soll
+          == hk_ziel) }}'
+      sequence:
+      - action: climate.set_temperature
+        target:
+          entity_id: '{{ heizkoerper }}'
+        data:
+          hvac_mode: heat
+          temperature: '{{ hk_ziel }}'
+    - alias: Aus
+      conditions:
+      - condition: template
+        value_template: '{{ not heizen and not hk_zu }}'
+      sequence:
+      - action: climate.set_hvac_mode
+        target:
+          entity_id: '{{ heizkoerper }}'
+        data:
+          hvac_mode: 'off'

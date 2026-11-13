@@ -1,0 +1,32 @@
+# Tibber-Preisvorschau (heute + morgen in Viertelstunden) als sensor.tibber_preise (Package)
+# Aus https://github.com/NobseVomBerg/GrabBag - MIT-Lizenz, ohne Gewähr. Entity-IDs an die eigene Anlage anpassen.
+template:
+# Tibber price preview (today + tomorrow, 15-min slots) for the price chart and later price automations.
+# Prices are published once a day (tomorrow ~ from 14:00) and never change afterwards,
+# so they are fetched only at start/reload, after midnight and a few times in the afternoon.
+- triggers:
+  - trigger: homeassistant
+    event: start
+  - trigger: event
+    event_type: event_template_reloaded
+  - trigger: time
+    at: ["00:00:30", "14:00:00", "15:00:00", "16:30:00", "18:00:00"]
+  actions:
+  - action: tibber.get_prices
+    data:
+      start: "{{ today_at().strftime('%Y-%m-%d %H:%M:%S') }}"
+      end: "{{ (today_at() + timedelta(days=2)).strftime('%Y-%m-%d %H:%M:%S') }}"
+    response_variable: tibber
+  sensor:
+  - name: Tibber Preise
+    unique_id: tibber_preise_vorschau
+    icon: mdi:chart-bar
+      # number of known 15-min slots: 96 = only today, 192 = today + tomorrow
+    state: "{{ (tibber.prices.values() | list | first | default([])) | count }}"
+    attributes:
+      prices: >
+        {% set ns = namespace(l=[]) %}
+        {% for x in (tibber.prices.values() | list | first | default([])) %}
+        {% set ns.l = ns.l + [{'s': x.start_time, 'p': x.price}] %}
+        {% endfor %}
+        {{ ns.l }}

@@ -1,0 +1,171 @@
+# Ladeplan, PV-Prognose-Faktor und Akku-Schutz beim Autoladen (Package)
+# Aus https://github.com/NobseVomBerg/GrabBag - MIT-Lizenz, ohne Gewähr. Entity-IDs an die eigene Anlage anpassen.
+# Logik des Plans: netzladeplan.jinja (nach config/custom_templates/). Doku: README.md in diesem Ordner.
+template:
+# Preis-Automatik (Hausakkus nach Tibber-Preis und PV-Prognose) - Logik im Makro custom_templates/netzladeplan.jinja.
+# Der Plan wird bewusst NICHT nachts neu berechnet, damit ein laufendes Ladefenster stabil bleibt.
+- triggers:
+  - trigger: homeassistant
+    event: start
+  - trigger: event
+    event_type: event_template_reloaded
+  - trigger: time_pattern
+    minutes: "/15"
+    seconds: 5
+  # Preise für morgen sind da (heute allein hat höchstens 100 Viertelstunden)
+  - trigger: template
+    value_template: "{{ states('sensor.tibber_preise') | int(0) > 100 }}"
+  - trigger: state
+    entity_id:
+    - input_number.max_ladepreis_netz
+    - input_number.mindestvorteil_netzladen
+    - input_number.hausverbrauch_pro_tag
+    - binary_sensor.netzladen_saison
+    not_to: [unavailable, unknown]
+  actions:
+  - variables:
+      plan: "{% from 'netzladeplan.jinja' import ladeplan %}{{ ladeplan() | from_json }}"
+  sensor:
+  - name: Netzladeplan
+    unique_id: netzladeplan
+    icon: >
+      {{ {'laden': 'mdi:battery-charging-high', 'halten': 'mdi:battery-lock', 'warten': 'mdi:battery-clock', 'kein Bedarf': 'mdi:battery-check',
+          'Sommer': 'mdi:weather-sunny'}.get(plan.zustand, 'mdi:battery-off-outline') }}
+    state: "{{ plan.zustand }}"
+    attributes:
+      grund: "{{ plan.grund }}"
+      laden: "{{ plan.laden }}"
+      halten: "{{ plan.halten }}"
+      spitze_ab: "{{ plan.spitze_ab }}"
+      pv_ab: "{{ plan.pv_ab }}"
+      pv_bis: "{{ plan.pv_bis }}"
+      pv_ueberschuss_kwh: "{{ plan.pv_ueberschuss_kwh }}"
+      pv_fuellt_akku: "{{ plan.pv_fuellt_akku }}"
+      pv_kappung: "{{ plan.pv_kappung }}"
+      pv_faktor_plan: "{{ plan.pv_faktor_plan }}"
+      pv_vorsichtig: "{{ plan.pv_vorsichtig }}"
+      pv_jetzt_kw: "{{ plan.pv_jetzt_kw }}"
+      ziel_soc: "{{ plan.ziel_soc }}"
+      preis_jetzt: "{{ plan.preis_jetzt }}"
+      vergleichspreis: "{{ plan.vergleichspreis }}"
+      bedarf_kwh: "{{ plan.bedarf_kwh }}"
+      soll_kwh: "{{ plan.soll_kwh }}"
+      akku_kwh: "{{ plan.akku_kwh }}"
+      pv_rest_kwh: "{{ plan.pv_rest_kwh }}"
+      verbrauch_w: "{{ plan.verbrauch_w }}"
+      verbrauch_quelle: "{{ plan.verbrauch_quelle }}"
+      bis: "{{ plan.bis }}"
+      horizont_ende: "{{ plan.horizont_ende }}"
+      guenstigste_zeit: "{{ plan.guenstigste_zeit }}"
+      guenstigster_preis: "{{ plan.guenstigster_preis }}"
+      berechnet: "{{ now().isoformat() }}"
+# PV-Prognose-Faktor: echter Tagesertrag (WR1 + WR2) / Forecast.Solar-Prognose von 06:30, Summe der letzten 14 Tage.
+# Die Prognose kennt die Verschattung nicht (Gebäude, Berge) und liegt meist zu hoch.
+# Tage mit Ausfall eines WR (einer < 50 % des anderen) zählen nicht. Solange noch kein Tag gesammelt ist, gilt Faktor 1.
+- triggers:
+  - trigger: homeassistant
+    event: start
+    id: start
+  - trigger: event
+    event_type: event_template_reloaded
+    id: start
+  - trigger: time
+    at: "06:30:00"
+    id: morgens
+  - trigger: time
+    at: "23:50:00"
+    id: abends
+  actions:
+  - variables:
+      tage_alt: "{{ state_attr('sensor.pv_prognose_faktor', 'tage') or [] }}"
+      prog_morgens: >
+        {% set alt = state_attr('sensor.pv_prognose_faktor', 'prognose_morgens') %}
+        {{ states('sensor.energy_production_today') | float(0) if trigger.id == 'morgens' or alt is none else alt | float(0) }}
+      tage: >
+        {% set w1 = states('sensor.daily_pv_generation') | float(0) %}
+        {% set w2 = states('sensor.wr2_daily_pv_generation') | float(0) %}
+        {% set ausfall = [w1, w2] | max > 3 and [w1, w2] | min < 0.5 * [w1, w2] | max %}
+        {% if trigger.id == 'abends' and prog_morgens > 1 and not ausfall %}
+          {{ (tage_alt + [{'d': now().strftime('%Y-%m-%d'), 'ist': (w1 + w2) | round(1), 'prog': prog_morgens | round(1)}])[-14:] }}
+        {% else %}{{ tage_alt }}{% endif %}
+  sensor:
+  - name: PV-Prognose Faktor
+    unique_id: pv_prognose_faktor
+    icon: mdi:weather-partly-cloudy
+    state: >
+      {% set prog = tage | map(attribute='prog') | sum %}
+      {{ ([[(tage | map(attribute='ist') | sum) / prog, 0.3] | max, 1.1] | min) | round(2) if prog > 0 else 1 }}
+    attributes:
+      tage: "{{ tage }}"
+      prognose_morgens: "{{ prog_morgens | round(1) }}"
+# Akku-Schutz beim Autoladen (ganzjährig): Auto lädt zu Hause, PV reicht nicht für das Auto UND der Hausakku ist knapp.
+- sensor:
+  - name: Autoladeleistung
+    unique_id: autoladeleistung
+    unit_of_measurement: W
+    device_class: power
+    icon: mdi:car-electric
+    # Wallbox gemessen; lädt eines der beiden Autos zu Hause ohne die Wallbox, hängt es am go-e -> Leistung aus der Fahrzeug-API.
+    # Das dritte Auto am go-e ist nicht erkennbar.
+    # Fahrzeug-API nur mit frischen Daten (< 20 min, die Integration fragt alle 11 min ab): Die Autos laden beim Einstecken
+    # nur Sekunden und schlafen dann ein, in der Integration bleibt "lädt mit 4 kW" stehen (04.11.2026: 14 h Akku-Schutz
+    # ohne ladendes Auto). Außerdem höchstens der gemessene Hausverbrauch (go-e und Wallbox hängen mit dran).
+    # auto_1 / auto_2 sind Platzhalter: die Gerätenamen der eigenen Fahrzeuge eintragen und die Entity-Endungen
+    # (_charger_power, _charging, _location_tracker, _data_last_update_time) an deren Integration anpassen.
+    state: >
+      {% set wb = states('sensor.wallbox_load_power') | float(0) %}
+      {% set ns = namespace(p=wb) %}
+      {% for car in ['auto_1', 'auto_2'] if wb < 500 %}
+        {% set stand = states('sensor.' ~ car ~ '_data_last_update_time') | as_datetime(none) %}
+        {% if stand is not none and now() - stand < timedelta(minutes=20)
+              and is_state('binary_sensor.' ~ car ~ '_charging', 'on') and is_state('device_tracker.' ~ car ~ '_location_tracker', 'home') %}
+          {% set ns.p = ns.p + states('sensor.' ~ car ~ '_charger_power') | float(0) * 1000 %}
+        {% endif %}
+      {% endfor %}
+      {{ ([ns.p, states('sensor.sum_load_power') | float(99999)] | min / 100) | round(0) * 100 }}
+  # Hausverbrauch ohne die erkannten Autos (Wallbox + auto_1/auto_2 am go-e) - Grundlage für den 14-Tage-Schnitt im Ladeplan.
+  # Das dritte Auto (meist 2-kW-Lader) ist nicht erkennbar und zählt mit.
+  - name: Hausverbrauch ohne Autos
+    unique_id: hausverbrauch_ohne_autos
+    unit_of_measurement: W
+    device_class: power
+    state_class: measurement
+    icon: mdi:home-lightning-bolt-outline
+    availability: "{{ has_value('sensor.sum_load_power') and has_value('sensor.autoladeleistung') }}"
+    state: "{{ [states('sensor.sum_load_power') | float(0) - states('sensor.autoladeleistung') | float(0), 0] | max | round(0) }}"
+  binary_sensor:
+  - name: Akku-Schutz Autoladen
+    unique_id: akku_schutz_autoladen
+    icon: mdi:home-battery-outline
+    delay_on:
+      minutes: 2
+    delay_off:
+      minutes: 10
+    availability: "{{ has_value('sensor.battery_level') and has_value('sensor.wr2_battery_level') }}"
+    # an, wenn alles zutrifft:
+    #  - ein Auto lädt (> 1,5 kW) und die PV liefert weniger als das Auto braucht
+    #  - Ø SoC beider Akkus unter input_number.akku_schutz_min_soc (50 %)
+    #  - die restliche PV heute (pv_rest_heute(): Prognose gedeckelt auf den besten Tag der Vorjahre, minus 20 %,
+    #    minus Hausverbrauch bis Sonnenuntergang) bringt die Akkus nicht mehr auf input_number.akku_schutz_ziel_aus_pv (60 %)
+    # Sonst darf der Hausakku das Auto mitversorgen. Hysterese über this.state.
+    state: >
+      {% from 'netzladeplan.jinja' import pv_rest_heute, hausverbrauch_w %}
+      {% set auto = states('sensor.autoladeleistung') | float(0) %}
+      {% set pv = states('sensor.sum_total_dc_power') | float(0) %}
+      {% set an = this.state == 'on' %}
+      {% set soc = (states('sensor.battery_level') | float(0) + states('sensor.wr2_battery_level') | float(0)) / 2 %}
+      {% set min_soc = states('input_number.akku_schutz_min_soc') | float(50) + (2 if an else 0) %}
+      {% set ziel = states('input_number.akku_schutz_ziel_aus_pv') | float(60) %}
+      {% set h = [(as_datetime(state_attr('sun.sun', 'next_setting')) - now()).total_seconds() / 3600, 0] | max %}
+      {% set ueberschuss = pv_rest_heute() | float(0) - hausverbrauch_w().split('|')[0] | float(800) / 1000 * h %}
+      {% set fehlt = [ziel - soc, 0] | max / 100 * 32 %}
+      {{ auto > (500 if an else 1500) and pv < auto + (1000 if an else 0) and soc < min_soc and ueberschuss < fehlt }}
+    attributes:
+      soc_mittel: "{{ ((states('sensor.battery_level') | float(0) + states('sensor.wr2_battery_level') | float(0)) / 2) | round(1) }}"
+      pv_ueberschuss_heute_kwh: >
+        {% from 'netzladeplan.jinja' import pv_rest_heute, hausverbrauch_w %}
+        {% set h = [(as_datetime(state_attr('sun.sun', 'next_setting')) - now()).total_seconds() / 3600, 0] | max %}
+        {{ [pv_rest_heute() | float(0) - hausverbrauch_w().split('|')[0] | float(800) / 1000 * h, 0] | max | round(1) }}
+      bis_ziel_kwh: >
+        {% set soc = (states('sensor.battery_level') | float(0) + states('sensor.wr2_battery_level') | float(0)) / 2 %}
+        {{ ([states('input_number.akku_schutz_ziel_aus_pv') | float(60) - soc, 0] | max / 100 * 32) | round(1) }}

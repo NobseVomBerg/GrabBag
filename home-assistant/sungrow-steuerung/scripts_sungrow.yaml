@@ -1,0 +1,232 @@
+# Sungrow: Akku-Modus eines Wechselrichters schalten
+# Aus https://github.com/NobseVomBerg/GrabBag - MIT-Lizenz, ohne Gewähr. Entity-IDs an die eigene Anlage anpassen.
+#
+# Skripte:
+#   - sungrow_akku_modus: Normalbetrieb / Akku halten / Zwangsladen aus dem Netz für WR1 oder WR2
+#     (EMS-Modus + Lade-/Entladebefehl + Leistung per modbus.write_register, mit Prüfung der Übernahme)
+#
+# Einbinden: in der UI je Skript neu anlegen, "In YAML bearbeiten" und den Inhalt unter dem Schlüssel
+# einfügen (die Skript-ID muss gleich bleiben, die Automationen rufen sie auf). Oder in configuration.yaml:
+#   script sungrow: !include scripts_sungrow.yaml
+
+sungrow_akku_modus:
+  alias: Sungrow Akku-Modus
+  description: 'Schaltet einen Wechselrichter zwischen Normalbetrieb, Akku halten
+    und Zwangsladen aus dem Netz. Zwangsladen startet mit der Leistung, die unter
+    Budget (Netzbezug inkl. Auto) und Phasengrenze frei ist (bei zwei ladenden Akkus
+    je die Hälfte), höchstens mit der gewünschten Leistung; ''Sungrow: Zwangsladen
+    nachregeln'' passt sie danach laufend an. Abgelehnt wird nur unter 500 W oder
+    wenn der Ziel-SoC erreicht ist. Register: 13050 EMS-Modus, 13051 Befehl, 13052
+    Leistung. WICHTIG (Befund 22.10.2026): Der EMS-Modus (Register 13050) gleichen
+    beide WR untereinander ab, Befehl und Leistung gelten je WR. Normalbetrieb setzt
+    deshalb beide WR zurueck; Halten/Zwangsladen bringt den anderen WR mit in den
+    Forced mode (er haelt dann, ausser er laedt selbst).'
+  mode: queued
+  max: 5
+  icon: mdi:home-battery
+  fields:
+    wr:
+      name: Wechselrichter
+      required: true
+      selector:
+        select:
+          options:
+          - WR1
+          - WR2
+    modus:
+      name: Modus
+      required: true
+      selector:
+        select:
+          options:
+          - label: Normalbetrieb
+            value: normal
+          - label: Akku halten (weder laden noch entladen)
+            value: halten
+          - label: Zwangsladen aus dem Netz
+            value: laden
+    leistung:
+      name: Ladeleistung
+      description: Nur für Zwangsladen. Leer = Wert aus 'Zwangsladen Leistung'.
+      selector:
+        number:
+          min: 500
+          max: 10600
+          step: 100
+          unit_of_measurement: W
+  sequence:
+  - variables:
+      hub: '{{ ''WR1 SungrowSHx'' if wr == ''WR1'' else ''WR2 SungrowSHx'' }}'
+      geraet: '{{ 1 if wr == ''WR1'' else 2 }}'
+      p_self: '{{ '''' if wr == ''WR1'' else ''wr2_'' }}'
+      soc: '{{ states(''sensor.'' ~ p_self ~ ''battery_level'') | float(0) }}'
+      ziel_soc: '{{ states(''input_number.zwangsladen_ziel_soc'') | float(80) }}'
+      import_w: '{{ states(''sensor.import_power'') | float(0) }}'
+      budget_w: '{{ states(''input_number.ladebudget_gesamt'') | float(15000) }}'
+      max_phase_a: '{{ states(''sensor.netz_max_phasenstrom'') | float(0) }}'
+      grenze_a: '{{ states(''input_number.netz_phasengrenze'') | float(25) }}'
+      p_wunsch: '{{ [[ (leistung if leistung is defined and leistung else states(''input_number.zwangsladen_leistung''))
+        | int(5000), 500] | max, 10600] | min }}'
+      eigen_w: '{{ (states(''sensor.battery_charging_power'') | float(0) if is_state(''sensor.wr1_akku_modus'',
+        ''Zwangsladen'') else 0) + (states(''sensor.wr2_battery_charging_power'')
+        | float(0) if is_state(''sensor.wr2_akku_modus'', ''Zwangsladen'') else 0)
+        }}'
+      anzahl: '{{ 1 + (1 if is_state(''sensor.'' ~ (''wr2'' if wr == ''WR1'' else
+        ''wr1'') ~ ''_akku_modus'', ''Zwangsladen'') else 0) }}'
+      frei_w: '{{ [budget_w - (import_w - eigen_w) - 300, (grenze_a - 0.5 - (max_phase_a
+        - eigen_w / 690)) * 690] | min }}'
+      p: '{{ (([p_wunsch, frei_w / anzahl] | min) / 100) | round(0, ''floor'') | int
+        * 100 }}'
+      fehler: '{% if modus != ''laden'' %}{% elif soc >= ziel_soc %}{{ wr }} hat das
+        Ziel von {{ ziel_soc | int }} % schon erreicht ({{ soc }} %).{% elif p < 500
+        %}Nur {{ [p, 0] | max }} W frei: Netzbezug {{ import_w | int }} W bei Budget
+        {{ budget_w | int }} W, stärkste Phase {{ max_phase_a }} A bei Grenze {{ grenze_a
+        | int }} A.{% endif %}'
+      hub_x: '{{ ''WR2 SungrowSHx'' if wr == ''WR1'' else ''WR1 SungrowSHx'' }}'
+      geraet_x: '{{ 2 if wr == ''WR1'' else 1 }}'
+      modus_x: '{{ states(''sensor.'' ~ (''wr2'' if wr == ''WR1'' else ''wr1'') ~
+        ''_akku_modus'') }}'
+  - if:
+    - condition: template
+      value_template: '{{ fehler | trim != '''' }}'
+    then:
+    - action: persistent_notification.create
+      data:
+        title: Zwangsladen {{ wr }} abgelehnt
+        message: '{{ fehler | trim }}'
+        notification_id: sungrow_{{ wr | lower }}_abgelehnt
+    - stop: Zwangsladen abgelehnt
+      error: true
+  - choose:
+    - conditions:
+      - condition: template
+        value_template: '{{ modus == ''laden'' }}'
+      sequence:
+      - if:
+        - condition: template
+          value_template: '{{ modus_x != ''Zwangsladen'' }}'
+        then:
+        - action: modbus.write_register
+          data:
+            hub: '{{ hub_x }}'
+            slave: '{{ geraet_x }}'
+            address: 13050
+            value: 204
+        - action: modbus.write_register
+          data:
+            hub: '{{ hub_x }}'
+            slave: '{{ geraet_x }}'
+            address: 13051
+            value: 0
+        note: 'Der EMS-Modus gilt fuer beide WR gemeinsam: der andere WR geht mit
+          in den Forced mode und soll dann halten, nicht mit einem alten Ladebefehl
+          laden'
+      - action: modbus.write_register
+        data:
+          hub: '{{ hub }}'
+          slave: '{{ geraet }}'
+          address: 13051
+          value: '{{ p }}'
+      - action: modbus.write_register
+        data:
+          hub: '{{ hub }}'
+          slave: '{{ geraet }}'
+          address: 13050
+          value: 170
+      - action: modbus.write_register
+        data:
+          hub: '{{ hub }}'
+          slave: '{{ geraet }}'
+          address: 13049
+          value: 2
+    - conditions:
+      - condition: template
+        value_template: '{{ modus == ''halten'' }}'
+      sequence:
+      - action: modbus.write_register
+        data:
+          hub: '{{ hub }}'
+          slave: '{{ geraet }}'
+          address: 13051
+          value: 0
+      - action: modbus.write_register
+        data:
+          hub: '{{ hub }}'
+          slave: '{{ geraet }}'
+          address: 13050
+          value: 204
+      - action: modbus.write_register
+        data:
+          hub: '{{ hub }}'
+          slave: '{{ geraet }}'
+          address: 13049
+          value: 2
+    default:
+    - action: modbus.write_register
+      data:
+        hub: '{{ hub }}'
+        slave: '{{ geraet }}'
+        address: 13050
+        value: 204
+    - action: modbus.write_register
+      data:
+        hub: '{{ hub }}'
+        slave: '{{ geraet }}'
+        address: 13051
+        value: 0
+    - action: modbus.write_register
+      data:
+        hub: '{{ hub_x }}'
+        slave: '{{ geraet_x }}'
+        address: 13050
+        value: 204
+      note: 'Normalbetrieb gilt fuer beide WR (gemeinsamer EMS-Modus): auch beim anderen
+        Befehl und Leistung zuruecksetzen'
+    - action: modbus.write_register
+      data:
+        hub: '{{ hub_x }}'
+        slave: '{{ geraet_x }}'
+        address: 13051
+        value: 0
+    - action: modbus.write_register
+      data:
+        hub: '{{ hub }}'
+        slave: '{{ geraet }}'
+        address: 13049
+        value: 0
+    - action: modbus.write_register
+      data:
+        hub: '{{ hub_x }}'
+        slave: '{{ geraet_x }}'
+        address: 13049
+        value: 0
+  - delay:
+      seconds: 25
+  - variables:
+      soll_ems: '{{ ''Self-consumption mode (default)'' if modus == ''normal'' else
+        ''Forced mode'' }}'
+      soll_cmd: '{{ ''Forced charge'' if modus == ''laden'' else ''Stop (default)''
+        }}'
+  - if:
+    - condition: template
+      value_template: '{{ not (is_state(''sensor.'' ~ p_self ~ ''ems_mode_selection'',
+        soll_ems) and is_state(''sensor.'' ~ p_self ~ ''battery_forced_charge_discharge_cmd'',
+        soll_cmd)) }}'
+    then:
+    - action: persistent_notification.create
+      data:
+        title: '{{ wr }}: Rückmeldung passt nicht'
+        message: Erwartet {{ soll_ems }} / {{ soll_cmd }}, gemeldet {{ states('sensor.'
+          ~ p_self ~ 'ems_mode_selection') }} / {{ states('sensor.' ~ p_self ~ 'battery_forced_charge_discharge_cmd')
+          }}.
+        notification_id: sungrow_{{ wr | lower }}_rueckmeldung
+  - if:
+    - condition: template
+      value_template: '{{ modus == ''laden'' }}'
+    then:
+    - action: automation.trigger
+      target:
+        entity_id: automation.sungrow_zwangsladen_nachregeln
+      data:
+        skip_condition: false
+      continue_on_error: true

@@ -1,0 +1,97 @@
+# Jalousien nach Sonnenstand (Shelly 2PM Gen3)
+# Aus https://github.com/NobseVomBerg/GrabBag - MIT-Lizenz, ohne Gewähr. Entity-IDs an die eigene Anlage anpassen.
+#
+# Automationen:
+#   - Jalousie Büro 2: runter bei einstellbarem Sonnenstand, 30 min nach Sonnenaufgang hoch
+#   - Jalousien Schlafzimmer: abends zu; bei offener Balkontür wartet deren Jalousie, bis die Tür zu ist
+#
+# Braucht:
+#   - script.jalousie_sicher_fahren und script.jalousie_befehl aus scripts_jalousien.yaml
+#   - Helfer aus helfer_jalousien.yaml
+#
+# Einbinden: in der UI je Automation neu anlegen, "In YAML bearbeiten" und den Block einfügen
+# (bleibt in der UI editierbar). Oder die ganze Datei in configuration.yaml einbinden:
+#   automation jalousien: !include automations_jalousien.yaml
+# (dann in der UI nur lesbar).
+
+- id: '1791927207686'
+  alias: 'Jalousie Büro 2: nach Sonnenstand'
+  description: 'Jalousie EG Büro 2 (Shelly 2PM Gen3): runter, sobald die Sonne
+    unter input_number.jalousie_buro_2_zu_bei_sonnenstand sinkt (Grad, Start -2),
+    30 min nach Sonnenaufgang hoch. Fahren über script.jalousie_sicher_fahren (bis
+    zu 6 Versuche bei Verbindungsabbrüchen).'
+  triggers:
+  - trigger: sun.elevation_crossed_threshold
+    options:
+      threshold:
+        type: below
+        value:
+          entity: input_number.jalousie_buro_2_zu_bei_sonnenstand
+    id: runter
+  - trigger: sun
+    event: sunrise
+    offset: 00:30:00
+    id: hoch
+  conditions: []
+  actions:
+  - choose:
+    - conditions:
+      - condition: trigger
+        id: runter
+      sequence:
+      - action: script.jalousie_sicher_fahren
+        data:
+          jalousie: cover.jal_eg_buro2
+          richtung: zu
+    - conditions:
+      - condition: trigger
+        id: hoch
+      sequence:
+      - action: script.jalousie_sicher_fahren
+        data:
+          jalousie: cover.jal_eg_buro2
+          richtung: auf
+    note: Wiederholt den Befehl, falls der Shelly gerade kurz die Verbindung verliert
+  mode: single
+- id: '1792074666985'
+  alias: 'Jalousien Schlafzimmer: abends zu'
+  description: 'Jalousien OG Schlafzimmer (Fenster + Balkontür, Shelly 2PM Gen3):
+    zu, sobald die Sonne unter input_number.jalousien_zu_bei_sonnenstand sinkt (Grad
+    unter dem Horizont, Start -2,5). Kein automatisches Öffnen. Ist die Balkontür
+    offen, fährt deren Jalousie erst, wenn die Tür zu ist (höchstens 3 h warten).
+    Fahren über script.jalousie_sicher_fahren (bis zu 6 Versuche bei Verbindungsabbrüchen).'
+  triggers:
+  - trigger: sun.elevation_crossed_threshold
+    options:
+      threshold:
+        type: below
+        value:
+          entity: input_number.jalousien_zu_bei_sonnenstand
+    note: 'Gleiche Dunkelheit statt fester Zeit: -2,5 Grad = Mitte Oktober ca. 10
+      min nach Sonnenuntergang'
+  conditions: []
+  actions:
+  - action: script.jalousie_sicher_fahren
+    data:
+      jalousie: cover.jal_og_schlafz_fenster
+      richtung: zu
+    note: Wiederholt den Befehl, falls der Shelly gerade kurz die Verbindung verliert
+  - if:
+    - condition: state
+      entity_id: binary_sensor.balkontuer_og_schlafz
+      state: 'on'
+    then:
+    - wait_for_trigger:
+      - trigger: state
+        entity_id: binary_sensor.balkontuer_og_schlafz
+        to: 'off'
+        for: 00:00:30
+      timeout: 03:00:00
+      continue_on_timeout: false
+    note: Niemanden auf dem Balkon aussperren
+  - action: script.jalousie_sicher_fahren
+    data:
+      jalousie: cover.jal_og_schlafz_balkontur
+      richtung: zu
+  mode: single
+  max_exceeded: silent

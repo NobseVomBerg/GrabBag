@@ -1,0 +1,66 @@
+# Energiefluss für zwei Wechselrichter (WR1 mit Netzzähler, WR2 ohne) - für die tesla-style-solar-power-card
+# Aus https://github.com/NobseVomBerg/GrabBag - MIT-Lizenz, ohne Gewähr. Entity-IDs an die eigene Anlage anpassen.
+# Rechnung in power_flow.jinja (nach config/custom_templates/). Braucht die Summen aus
+# templates_solarsystem_summary.yaml und die Modbus-Sensoren aus ../sungrow-modbus/.
+
+template:
+  - sensor:
+    # Power flow for 2 inverters - math lives in custom_templates/power_flow.jinja
+    # Inverter loss: DC in (PV + battery discharge) minus DC to battery minus AC out of both WR
+      - name: "Inverter loss"
+        unit_of_measurement: W
+        device_class: power
+        availability: >
+          {{ has_value('sensor.sum_total_dc_power') and has_value('sensor.sum_signed_battery_power')
+             and has_value('sensor.total_active_power') and has_value('sensor.wr2_total_active_power') }}
+        state: >
+          {{ (states('sensor.sum_total_dc_power')|float - states('sensor.sum_signed_battery_power')|float
+              - states('sensor.total_active_power')|float - states('sensor.wr2_total_active_power')|float) | round(0) | int }}
+
+      - name: "Real load" # includes house power and inverter loss
+        unit_of_measurement: W
+        device_class: power
+        availability: "{{ has_value('sensor.sum_load_power') and has_value('sensor.inverter_loss') }}"
+        state: "{{ states('sensor.sum_load_power')|int + states('sensor.inverter_loss')|int }}"
+
+      - name: "Grid to House"
+        unit_of_measurement: W
+        device_class: power
+        availability: "{% from 'power_flow.jinja' import power_flow_available %}{{ power_flow_available() }}"
+        state: "{% from 'power_flow.jinja' import power_flow %}{{ power_flow('grid_to_house') }}"
+
+      - name: "Grid to Battery"
+        unit_of_measurement: W
+        device_class: power
+        availability: "{% from 'power_flow.jinja' import power_flow_available %}{{ power_flow_available() }}"
+        state: "{% from 'power_flow.jinja' import power_flow %}{{ power_flow('grid_to_battery') }}"
+
+      - name: "Battery to House"
+        unit_of_measurement: W
+        device_class: power
+        availability: "{% from 'power_flow.jinja' import power_flow_available %}{{ power_flow_available() }}"
+        state: "{% from 'power_flow.jinja' import power_flow %}{{ power_flow('battery_to_house') }}"
+
+      - name: "Battery to Grid"
+        unit_of_measurement: W
+        device_class: power
+        availability: "{% from 'power_flow.jinja' import power_flow_available %}{{ power_flow_available() }}"
+        state: "{% from 'power_flow.jinja' import power_flow %}{{ power_flow('battery_to_grid') }}"
+
+      - name: "Solar to Grid"
+        unit_of_measurement: W
+        device_class: power
+        availability: "{% from 'power_flow.jinja' import power_flow_available %}{{ power_flow_available() }}"
+        state: "{% from 'power_flow.jinja' import power_flow %}{{ power_flow('solar_to_grid') }}"
+
+      - name: "Solar to House"
+        unit_of_measurement: W
+        device_class: power
+        availability: "{% from 'power_flow.jinja' import power_flow_available %}{{ power_flow_available() }}"
+        state: "{% from 'power_flow.jinja' import power_flow %}{{ power_flow('solar_to_house') }}"
+
+      - name: "Solar to Battery"
+        unit_of_measurement: W
+        device_class: power
+        availability: "{% from 'power_flow.jinja' import power_flow_available %}{{ power_flow_available() }}"
+        state: "{% from 'power_flow.jinja' import power_flow %}{{ power_flow('solar_to_battery') }}"

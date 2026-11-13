@@ -1,0 +1,276 @@
+# Heizung: Heizkörperthermostate folgen einem Raumthermostat (Homematic / Homematic IP)
+# Aus https://github.com/NobseVomBerg/GrabBag - MIT-Lizenz, ohne Gewähr. Entity-IDs an die eigene Anlage anpassen.
+#
+# Automationen:
+#   - je Raum: Heizkörper folgt Soll/Ist des Wandthermostats (mit Hysterese), Fenster/Tür offen -> aus
+#   - Soll nach 2 h zurück aufs Programm: manuelles Verstellen am Wandthermostat gilt nur 2 Stunden
+#
+# Braucht:
+#   - script.heizung_raum_regeln aus scripts_heizung.yaml
+#   - je Raum ein Wandthermostat und ein Heizkörperthermostat (climate.*) sowie Fensterkontakte
+#   - Timer aus helfer_heizung.yaml
+#
+# Einbinden: in der UI je Automation neu anlegen, "In YAML bearbeiten" und den Block einfügen
+# (bleibt in der UI editierbar). Oder die ganze Datei in configuration.yaml einbinden:
+#   automation heizung: !include automations_heizung.yaml
+# (dann in der UI nur lesbar).
+
+- id: heizung_wohnzimmer
+  alias: 'Heizung: Wohnzimmer'
+  description: 'Heizkörper Wohnzimmer (HM-CC-RT-DN) folgt dem Raumthermostat (Standard
+    18 °C, manuelle Änderungen werden nach 2 h zurückgesetzt). Balkontür Wohnzimmer,
+    Küchenfenster oder Küchen-Balkontür offen -> Heizkörper aus (die Tür zur Küche
+    steht meist offen, die Küche hat keine Heizung). Logik: script.heizung_raum_regeln.
+    Der 2-h-Timer der manuellen Verstellung ruht, solange ein Fenster oder eine Tür
+    offen ist.'
+  triggers:
+  - trigger: state
+    entity_id: climate.wandth_og_wnz
+  - trigger: state
+    entity_id:
+    - binary_sensor.balkontuer_og_wohnz
+    - binary_sensor.fenster_og_kuche
+    - binary_sensor.balkontur_dg_kuche
+  - trigger: state
+    entity_id: timer.wohnzimmer_soll_zurucksetzen
+    to: active
+    note: '2-h-Timer gestartet: bei offenem Fenster gleich anhalten'
+  - trigger: time_pattern
+    minutes: /10
+  - trigger: homeassistant
+    event: start
+  conditions: []
+  actions:
+  - action: script.heizung_raum_regeln
+    data:
+      thermostat: climate.wandth_og_wnz
+      heizkoerper: climate.heizth_og_wohnz
+      fenster:
+      - binary_sensor.balkontuer_og_wohnz
+      - binary_sensor.fenster_og_kuche
+      - binary_sensor.balkontur_dg_kuche
+      timer: timer.wohnzimmer_soll_zurucksetzen
+  mode: queued
+  max: 3
+- id: heizung_schlafzimmer
+  alias: 'Heizung: Schlafzimmer'
+  description: 'Heizkörper Schlafzimmer (HmIP-eTRV-B) folgt dem Raumthermostat (Wochenprogramm
+    P1 = früheres P3 des Heizkörpers, manuelle Änderungen nach 2 h zurück aufs Programm).
+    Fenster oder Balkontür offen -> Heizkörper aus. Logik: script.heizung_raum_regeln.
+    Der 2-h-Timer der manuellen Verstellung ruht, solange ein Fenster oder eine Tür
+    offen ist.'
+  triggers:
+  - trigger: state
+    entity_id: climate.wandth_og_schlafz
+  - trigger: state
+    entity_id:
+    - binary_sensor.fenster_og_schlafz
+    - binary_sensor.balkontuer_og_schlafz
+  - trigger: state
+    entity_id: timer.schlafzimmer_soll_zurucksetzen
+    to: active
+    note: '2-h-Timer gestartet: bei offenem Fenster gleich anhalten'
+  - trigger: time_pattern
+    minutes: /10
+  - trigger: homeassistant
+    event: start
+  conditions: []
+  actions:
+  - action: script.heizung_raum_regeln
+    data:
+      thermostat: climate.wandth_og_schlafz
+      heizkoerper: climate.heizth_og_schlafz
+      fenster:
+      - binary_sensor.fenster_og_schlafz
+      - binary_sensor.balkontuer_og_schlafz
+      timer: timer.schlafzimmer_soll_zurucksetzen
+  mode: queued
+  max: 3
+- id: heizung_buero_1
+  alias: 'Heizung: Büro 1'
+  description: 'Heizkörper Büro 1 (HmIP-eTRV-B-2) folgt dem Raumthermostat (vorerst
+    Standard 18 °C, manuelle Änderungen nach 2 h zurück). Eines der vier Fenster (Essecke,
+    #1-#3) oder das Küchenfenster offen -> Heizkörper aus (der Durchgang zur Küche
+    hat keine Tür). Vorübergehend - später kommt die Split-Klima (Hayer, 7,1 kW) dazu.
+    Logik: script.heizung_raum_regeln. Der 2-h-Timer der manuellen Verstellung ruht,
+    solange ein Fenster oder eine Tür offen ist.'
+  triggers:
+  - trigger: state
+    entity_id: climate.wandth_eg_buro1
+  - trigger: state
+    entity_id:
+    - binary_sensor.fenster_eg_buro1_essecke
+    - binary_sensor.fenster_eg_buro1_1
+    - binary_sensor.fenster_eg_buro1_2
+    - binary_sensor.fenster_eg_buro1_3
+    - binary_sensor.fenster_eg_kuche
+  - trigger: state
+    entity_id: timer.buro_1_soll_zurucksetzen
+    to: active
+    note: '2-h-Timer gestartet: bei offenem Fenster gleich anhalten'
+  - trigger: time_pattern
+    minutes: /10
+  - trigger: homeassistant
+    event: start
+  conditions: []
+  actions:
+  - action: script.heizung_raum_regeln
+    data:
+      thermostat: climate.wandth_eg_buro1
+      heizkoerper: climate.heizth_eg_buro1
+      fenster:
+      - binary_sensor.fenster_eg_buro1_essecke
+      - binary_sensor.fenster_eg_buro1_1
+      - binary_sensor.fenster_eg_buro1_2
+      - binary_sensor.fenster_eg_buro1_3
+      - binary_sensor.fenster_eg_kuche
+      timer: timer.buro_1_soll_zurucksetzen
+  mode: queued
+  max: 3
+- id: heizung_buero_2
+  alias: 'Heizung: Büro 2'
+  description: 'Heizkörper Büro 2 (HM-CC-RT-DN) folgt dem Raumthermostat (vorerst
+    Standard 18 °C, manuelle Änderungen nach 2 h zurück). Fenster gekippt oder offen
+    (Fenstergriff) -> Heizkörper aus. Logik: script.heizung_raum_regeln. Der 2-h-Timer
+    der manuellen Verstellung ruht, solange ein Fenster oder eine Tür offen ist.'
+  triggers:
+  - trigger: state
+    entity_id: climate.wandth_eg_buro2
+  - trigger: state
+    entity_id: binary_sensor.fenster_eg_buro2_dreh_window_state
+  - trigger: state
+    entity_id: timer.buro_2_soll_zurucksetzen
+    to: active
+    note: '2-h-Timer gestartet: bei offenem Fenster gleich anhalten'
+  - trigger: time_pattern
+    minutes: /10
+  - trigger: homeassistant
+    event: start
+  conditions: []
+  actions:
+  - action: script.heizung_raum_regeln
+    data:
+      thermostat: climate.wandth_eg_buro2
+      heizkoerper: climate.heizth_eg_buro2
+      fenster:
+      - binary_sensor.fenster_eg_buro2_dreh_window_state
+      timer: timer.buro_2_soll_zurucksetzen
+  mode: queued
+  max: 3
+- id: heizung_soll_zuruecksetzen
+  alias: 'Heizung: Soll nach 2 h zurück aufs Programm'
+  description: 'Wird der Sollwert an einem der Raumthermostate (Wohnzimmer OG, Schlafzimmer
+    OG, Büro 1, Büro 2) vom Wert seines Wochenprogramms weg verstellt, startet dessen
+    2-Stunden-Timer (jede weitere Verstellung startet ihn neu); läuft er ab, geht
+    der Sollwert zurück auf den Programmwert zu diesem Zeitpunkt (aus schedule_data
+    des Thermostats; Wohnzimmer und Büros haben ein flaches Programm mit 18 °C, Schlafzimmer
+    P1 mit Nacht/Abend-Zeiten). Wechselt das Programm selbst den Sollwert, passt er
+    zum Programm und der Timer wird abgebrochen. Ohne lesbares Programm gilt 18 °C.
+    Kommt die Rückstellung nicht an (Thermostat nicht erreichbar oder Sollwert nach
+    2 min nicht übernommen), startet derselbe Timer mit 15 min und es wird erneut
+    versucht, bis es klappt. Die Timer überstehen HA-Neustarts. Weiterer Raum: Thermostat
+    + Timer in ''timer_von'' und in den Triggern ergänzen. Der Timer ruht, solange
+    im Raum ein Fenster oder eine Tür offen ist (script.heizung_raum_regeln hält ihn
+    an), damit die Verstellung nach dem Lüften noch volle 2 h gilt.'
+  triggers:
+  - trigger: state
+    entity_id:
+    - climate.wandth_og_wnz
+    - climate.wandth_og_schlafz
+    - climate.wandth_eg_buro1
+    - climate.wandth_eg_buro2
+    attribute: temperature
+    id: verstellt
+  - trigger: event
+    event_type: timer.finished
+    event_data:
+      entity_id: timer.wohnzimmer_soll_zurucksetzen
+    id: abgelaufen
+  - trigger: event
+    event_type: timer.finished
+    event_data:
+      entity_id: timer.schlafzimmer_soll_zurucksetzen
+    id: abgelaufen
+  - trigger: event
+    event_type: timer.finished
+    event_data:
+      entity_id: timer.buro_1_soll_zurucksetzen
+    id: abgelaufen
+  - trigger: event
+    event_type: timer.finished
+    event_data:
+      entity_id: timer.buro_2_soll_zurucksetzen
+    id: abgelaufen
+  conditions: []
+  actions:
+  - choose:
+    - conditions:
+      - condition: trigger
+        id: verstellt
+      - condition: template
+        value_template: '{{ trigger.from_state.state not in [''unavailable'', ''unknown'']
+          and trigger.to_state.state not in [''unavailable'', ''unknown''] }}'
+      sequence:
+      - variables:
+          zieltimer: '{{ timer_von[trigger.entity_id] }}'
+          soll: '{{ trigger.to_state.attributes.temperature | float(18) }}'
+      - if:
+        - condition: template
+          value_template: '{{ soll | float(18) != programm_soll | float(18) }}'
+        then:
+        - action: timer.start
+          target:
+            entity_id: '{{ zieltimer }}'
+          data:
+            duration: 02:00:00
+        else:
+        - action: timer.cancel
+          target:
+            entity_id: '{{ zieltimer }}'
+    - conditions:
+      - condition: trigger
+        id: abgelaufen
+      sequence:
+      - if:
+        - condition: template
+          value_template: '{{ states(thermostat) not in [''unavailable'', ''unknown'']
+            }}'
+        then:
+        - action: climate.set_temperature
+          continue_on_error: true
+          target:
+            entity_id: '{{ thermostat }}'
+          data:
+            temperature: '{{ programm_soll | float(18) }}'
+        - wait_template: '{{ state_attr(thermostat, ''temperature'') | float(0) ==
+            programm_soll | float(18) }}'
+          timeout: 00:02:00
+          continue_on_timeout: true
+      - if:
+        - condition: template
+          value_template: '{{ state_attr(thermostat, ''temperature'') | float(0) !=
+            programm_soll | float(18) }}'
+        then:
+        - alias: 'Nicht angekommen (Thermostat nicht erreichbar): in 15 min nochmal'
+          action: timer.start
+          target:
+            entity_id: '{{ timer_von[thermostat] }}'
+          data:
+            duration: 00:15:00
+  variables:
+    timer_von:
+      climate.wandth_og_wnz: timer.wohnzimmer_soll_zurucksetzen
+      climate.wandth_og_schlafz: timer.schlafzimmer_soll_zurucksetzen
+      climate.wandth_eg_buro1: timer.buro_1_soll_zurucksetzen
+      climate.wandth_eg_buro2: timer.buro_2_soll_zurucksetzen
+    thermostat: '{% if trigger.id == ''verstellt'' %}{{ trigger.entity_id }}{% else
+      %}{% for k, v in timer_von.items() if v == trigger.event.data.entity_id %}{{
+      k }}{% endfor %}{% endif %}'
+    programm_soll: '{% set plan = state_attr(thermostat, ''schedule_data'') %}{% set
+      tag = plan[[''MONDAY'', ''TUESDAY'', ''WEDNESDAY'', ''THURSDAY'', ''FRIDAY'',
+      ''SATURDAY'', ''SUNDAY''][now().weekday()]] if plan else none %}{% if tag %}{%
+      set uhrzeit = now().strftime(''%H:%M'') %}{% set ns = namespace(soll=tag.base_temperature)
+      %}{% for p in tag.periods if p.starttime <= uhrzeit < p.endtime %}{% set ns.soll
+      = p.temperature %}{% endfor %}{{ ns.soll }}{% else %}18{% endif %}'
+  mode: queued
+  max: 10

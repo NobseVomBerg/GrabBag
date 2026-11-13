@@ -1,0 +1,193 @@
+# Additional Templates for M. Kaisers Home Assistant Sungrow inverter integration
+# It gives Summary and Avarage Values for two Inverters
+# Written by https://github.com/NobseVomBerg/
+# Last update 20240424
+
+template:
+  - sensor:
+    # Energy Daily
+      - name: "Sum Daily PV Generation"
+        unique_id: sum_daily_pv_generation
+        unit_of_measurement: kWh
+        device_class: energy
+        state_class: total_increasing
+        availability: "{{ has_value('sensor.daily_pv_generation') and has_value('sensor.wr2_daily_pv_generation') }}"
+        # WR1 and WR2 reset their counters a few minutes apart - hold the sum until both have reset,
+        # otherwise HA counts the not-yet-reset inverter twice in the statistics
+        state: >
+          {% set neu = (states('sensor.daily_pv_generation')|float + states('sensor.wr2_daily_pv_generation')|float) | round(1) %}
+          {{ this.state | float(0) if 1 <= neu < this.state | float(0) else neu }}
+
+      - name: "Sum Daily exported Energy"
+        unique_id: sum_daily_exported_energy
+        unit_of_measurement: kWh
+        device_class: energy
+        state_class: total_increasing
+        availability: "{{ has_value('sensor.daily_exported_energy') }}"
+        state: >
+          {{ states('sensor.daily_exported_energy')|float }}
+
+      - name: "Sum Daily exported Energy from PV"
+        unit_of_measurement: kWh
+        device_class: energy
+        state_class: total_increasing
+        availability: "{{ has_value('sensor.daily_exported_energy_from_pv') }}"
+        state: >
+          {{ states('sensor.daily_exported_energy_from_pv')|float }}
+
+      - name: "Sum Daily PV Generation & Battery Discharge"
+        unit_of_measurement: kWh
+        device_class: energy
+        state_class: total_increasing
+        availability: "{{ has_value('sensor.daily_pv_generation_battery_discharge') and has_value('sensor.wr2_daily_pv_generation_battery_discharge') }}"
+        # WR1 and WR2 reset their counters a few minutes apart - hold the sum until both have reset,
+        # otherwise HA counts the not-yet-reset inverter twice in the statistics
+        state: >
+          {% set neu = (states('sensor.daily_pv_generation_battery_discharge')|float + states('sensor.wr2_daily_pv_generation_battery_discharge')|float) | round(1) %}
+          {{ this.state | float(0) if 1 <= neu < this.state | float(0) else neu }}
+
+      - name: "Sum Daily Battery Charge from PV"
+        unit_of_measurement: kWh
+        device_class: energy
+        state_class: total_increasing
+        availability: "{{ has_value('sensor.daily_battery_charge_from_pv') and has_value('sensor.wr2_daily_battery_charge_from_pv') }}"
+        # WR1 and WR2 reset their counters a few minutes apart - hold the sum until both have reset,
+        # otherwise HA counts the not-yet-reset inverter twice in the statistics
+        state: >
+          {% set neu = (states('sensor.daily_battery_charge_from_pv')|float + states('sensor.wr2_daily_battery_charge_from_pv')|float) | round(1) %}
+          {{ this.state | float(0) if 1 <= neu < this.state | float(0) else neu }}
+
+      - name: "Sum Daily Battery Discharge"
+        unit_of_measurement: kWh
+        device_class: energy
+        state_class: total_increasing
+        availability: "{{ has_value('sensor.daily_battery_discharge') and has_value('sensor.wr2_daily_battery_discharge') }}"
+        # WR1 and WR2 reset their counters a few minutes apart - hold the sum until both have reset,
+        # otherwise HA counts the not-yet-reset inverter twice in the statistics
+        state: >
+          {% set neu = (states('sensor.daily_battery_discharge')|float + states('sensor.wr2_daily_battery_discharge')|float) | round(1) %}
+          {{ this.state | float(0) if 1 <= neu < this.state | float(0) else neu }}
+
+      - name: "Sum Daily imported Energy"
+        unit_of_measurement: kWh
+        device_class: energy
+        state_class: total_increasing
+        availability: "{{ has_value('sensor.daily_imported_energy') }}"
+        state: >
+          {{ states('sensor.daily_imported_energy')|float }}
+
+    # house consumption is only measured by WR1 (WR2 consumption entities are disabled)
+      - name: "Sum Daily consumed Energy"
+        unit_of_measurement: kWh
+        device_class: energy
+        state_class: total_increasing
+        availability: "{{ has_value('sensor.daily_consumed_energy') }}"
+        state: >
+          {{ states('sensor.daily_consumed_energy')|float }}
+
+    # Energy Monthly / Yearly
+      - name: "Sum Monthly PV Generation (current)"
+        unit_of_measurement: kWh
+        device_class: energy
+        state_class: total_increasing
+        availability: "{{ has_value('sensor.monthly_pv_generation_current') and has_value('sensor.wr2_monthly_pv_generation_current') }}"
+        # WR1 and WR2 reset their counters a few minutes apart - hold the sum until both have reset,
+        # otherwise HA counts the not-yet-reset inverter twice in the statistics
+        state: >
+          {% set neu = (states('sensor.monthly_pv_generation_current')|float + states('sensor.wr2_monthly_pv_generation_current')|float) | round(1) %}
+          {{ this.state | float(0) if 1 <= neu < this.state | float(0) else neu }}
+
+      - name: "Sum Monthly exported Energy (current)"
+        unit_of_measurement: kWh
+        device_class: energy
+        availability: "{{ has_value('sensor.monthly_export_current') }}"
+        state: >
+          {{ states('sensor.monthly_export_current')|float }}
+
+      - name: "Sum Yearly PV Generation (current)"
+        unit_of_measurement: kWh
+        device_class: energy
+        state_class: total_increasing
+        availability: "{{ has_value('sensor.yearly_pv_generation_current') and has_value('sensor.wr2_yearly_pv_generation_current') }}"
+        # WR1 and WR2 reset their counters a few minutes apart - hold the sum until both have reset,
+        # otherwise HA counts the not-yet-reset inverter twice in the statistics
+        state: >
+          {% set neu = (states('sensor.yearly_pv_generation_current')|float + states('sensor.wr2_yearly_pv_generation_current')|float) | round(1) %}
+          {{ this.state | float(0) if 1 <= neu < this.state | float(0) else neu }}
+
+    # Different Values
+      - name: "Sum Battery Capacity"
+        unit_of_measurement: kWh
+        device_class: energy_storage
+        state_class: measurement
+        availability: "{{ has_value('sensor.battery_capacity') and has_value('sensor.wr2_battery_capacity') }}"
+        state: >
+          {{ (states('sensor.battery_capacity')|float + states('sensor.wr2_battery_capacity')|float) | round(1) }}
+
+      - name: "Average Battery Level"
+        unit_of_measurement: "%"
+        device_class: battery
+        state_class: measurement
+        availability: "{{ has_value('sensor.battery_level') and has_value('sensor.wr2_battery_level') }}"
+        state: >
+          {{ ((states('sensor.battery_level')|float + states('sensor.wr2_battery_level')|float) / 2) | round(1) }}
+
+      - name: "Average Inverter Temperature"
+        unit_of_measurement: "°C"
+        device_class: temperature
+        availability: "{{ has_value('sensor.inverter_temperature') and has_value('sensor.wr2_inverter_temperature') }}"
+        state: >
+          {{ ((states('sensor.inverter_temperature')|float + states('sensor.wr2_inverter_temperature')|float) / 2) | round(1) }}
+
+    # Power
+      - name: "Sum Signed Battery Power"
+        unique_id: sum_signed_battery_power
+        unit_of_measurement: W
+        device_class: power
+        availability: "{{ has_value('sensor.signed_battery_power') and has_value('sensor.wr2_signed_battery_power') }}"
+        state: >
+          {{ states('sensor.signed_battery_power')|int + states('sensor.wr2_signed_battery_power')|int }}
+
+      - name: "Sum Total DC Power"
+        unit_of_measurement: W
+        device_class: power
+        availability: "{{ has_value('sensor.total_dc_power') and has_value('sensor.wr2_total_dc_power') }}"
+        state: >
+          {{ states('sensor.total_dc_power')|int + states('sensor.wr2_total_dc_power')|int }}
+
+    # house consumption: WR1 measures it via the grid meter (incl. grid import), WR2 has no meter -
+    # its own "load power" register is not valid, so add WR2's AC output instead
+      - name: "Sum Load Power"
+        unit_of_measurement: W
+        device_class: power
+        availability: "{{ has_value('sensor.load_power') and has_value('sensor.wr2_total_active_power') }}"
+        state: >
+          {{ states('sensor.load_power')|int + states('sensor.wr2_total_active_power')|int }}
+
+      - name: "House without Wallbox Power"
+        unit_of_measurement: W
+        device_class: power
+        availability: "{{ has_value('sensor.sum_load_power') and has_value('sensor.wallbox_load_power') }}"
+        state: >
+          {{ states('sensor.sum_load_power')|int - states('sensor.wallbox_load_power')|int }}
+
+      - name: "Sum Signed Grid Power"
+        unit_of_measurement: W
+        device_class: power
+        availability: "{{ has_value('sensor.export_power') and has_value('sensor.import_power') }}"
+        state: >
+          {{ states('sensor.export_power')|int - states('sensor.import_power')|int }}
+
+      - name: "Sum Battery Charging Power"
+        unit_of_measurement: W
+        device_class: power
+        availability: "{{ has_value('sensor.battery_charging_power') and has_value('sensor.wr2_battery_charging_power') }}"
+        state: >
+          {{ states('sensor.battery_charging_power')|int + states('sensor.wr2_battery_charging_power')|int }}
+
+      - name: "Sum Battery Discharging Power"
+        unit_of_measurement: W
+        device_class: power
+        availability: "{{ has_value('sensor.battery_discharging_power') and has_value('sensor.wr2_battery_discharging_power') }}"
+        state: >
+          {{ states('sensor.battery_discharging_power')|int + states('sensor.wr2_battery_discharging_power')|int }}

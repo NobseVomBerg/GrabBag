@@ -1,0 +1,524 @@
+# Preis-Automatik: Hausakkus nach dynamischem Strompreis (Tibber) laden und halten
+# Aus https://github.com/NobseVomBerg/GrabBag - MIT-Lizenz, ohne Gewähr. Entity-IDs an die eigene Anlage anpassen.
+#
+# Automationen:
+#   - Laden nach Plan: setzt sensor.netzladeplan um (alle 15 min: laden / halten / freigeben)
+#   - PV-Überschuss trotz Halten in den Akku: hält der Plan die Akkus, geht echter PV-Überschuss trotzdem hinein
+#   - Hausakku schützen beim Autoladen: Akkus halten, solange ein Auto lädt und der Hausakku knapp ist
+#
+# Braucht:
+#   - alles aus automations_sungrow.yaml / scripts_sungrow.yaml / helfer_sungrow.yaml
+#   - sensor.netzladeplan und binary_sensor.akku_schutz_autoladen aus ../ladeplan/ (Tibber-Preise + PV-Prognose)
+#
+# Einbinden: in der UI je Automation neu anlegen, "In YAML bearbeiten" und den Block einfügen
+# (bleibt in der UI editierbar). Oder die ganze Datei in configuration.yaml einbinden:
+#   automation preis: !include automations_preis_automatik.yaml
+# (dann in der UI nur lesbar).
+
+- id: preis_automatik_netzladen
+  alias: 'Preis-Automatik: Laden nach Plan'
+  description: 'Setzt den Netzladeplan (sensor.netzladeplan, alle 15 min neu) um.
+    ''laden'': Ziel-SoC aus dem Plan setzen und beide Akkus zwangsladen (Leistung
+    regelt ''Sungrow: Zwangsladen nachregeln''). ''halten'': Akkus auf ''Akku halten'',
+    damit ihre Energie fuer die teureren Viertelstunden bleibt (input_boolean.akku_halten_durch_plan
+    an). Sonst eigenes Laden/Halten beenden: zurueck auf ''Akku halten'', wenn vorher
+    von Hand oder vom Autoladen-Schutz gehalten wurde (input_boolean.wr1/wr2_vor_netzladen_akku_halten)
+    oder der Schutz aktiv ist, sonst Normalbetrieb fuer beide (gemeinsamer EMS-Modus).
+    Manuelles Zwangsladen (input_boolean.netzladen_durch_automatik aus) und fremdes
+    Halten haben Vorrang. Waehrend ''halten'' darf ''Preis-Automatik: PV-Ueberschuss
+    trotz Halten in den Akku'' fuer PV-Ueberschuss kurz auf Normalbetrieb gehen (input_boolean.akku_halten_pause_fur_pv_uberschuss).
+    Unbekannte Plan- oder WR-Zustaende (Template-Reload, Neustart) werden uebergangen;
+    sobald die WR-Modi wieder bekannt sind, wird der Plan erneut umgesetzt.'
+  triggers:
+  - trigger: state
+    entity_id: sensor.netzladeplan
+    not_to:
+    - unavailable
+    - unknown
+  - trigger: state
+    entity_id: input_boolean.preis_automatik
+    to: 'on'
+  - trigger: state
+    entity_id:
+    - sensor.wr1_akku_modus
+    - sensor.wr2_akku_modus
+    from:
+    - unbekannt
+    - unavailable
+    - unknown
+    note: 'WR-Modus wieder bekannt (nach Template-Reload/Neustart): Plan erneut umsetzen'
+  conditions:
+  - condition: state
+    entity_id: input_boolean.preis_automatik
+    state: 'on'
+  - condition: not
+    conditions:
+    - condition: state
+      entity_id: sensor.netzladeplan
+      state:
+      - unavailable
+      - unknown
+    - condition: state
+      entity_id: sensor.wr1_akku_modus
+      state:
+      - unbekannt
+      - unavailable
+      - unknown
+    - condition: state
+      entity_id: sensor.wr2_akku_modus
+      state:
+      - unbekannt
+      - unavailable
+      - unknown
+    note: 'Waehrend eines Template-Reloads sind Plan und WR-Modi kurz unbekannt: dann
+      nichts tun, sonst geht das Plan-Flag verloren und der Akku bleibt gehalten (09.11.2026)'
+  actions:
+  - choose:
+    - alias: Manuelles Zwangsladen läuft - nichts tun
+      conditions:
+      - condition: state
+        entity_id: input_boolean.netzladen_durch_automatik
+        state: 'off'
+      - condition: or
+        conditions:
+        - condition: state
+          entity_id: sensor.wr1_akku_modus
+          state: Zwangsladen
+        - condition: state
+          entity_id: sensor.wr2_akku_modus
+          state: Zwangsladen
+      sequence:
+      - stop: Manuelles Zwangsladen hat Vorrang
+    - alias: Laden
+      conditions:
+      - condition: state
+        entity_id: sensor.netzladeplan
+        state: laden
+      sequence:
+      - action: input_number.set_value
+        target:
+          entity_id: input_number.zwangsladen_ziel_soc
+        data:
+          value: '{{ state_attr(''sensor.netzladeplan'', ''ziel_soc'') | int(80) }}'
+      - action: input_boolean.turn_on
+        target:
+          entity_id: input_boolean.netzladen_durch_automatik
+      - if:
+        - condition: numeric_state
+          entity_id: sensor.battery_level
+          below: input_number.zwangsladen_ziel_soc
+        - condition: not
+          conditions:
+          - condition: state
+            entity_id: sensor.wr1_akku_modus
+            state: Zwangsladen
+        then:
+        - if:
+          - condition: state
+            entity_id: sensor.wr1_akku_modus
+            state: Akku halten
+          - condition: state
+            entity_id: input_boolean.akku_halten_durch_plan
+            state: 'off'
+          - condition: state
+            entity_id: binary_sensor.akku_schutz_autoladen
+            state: 'off'
+          then:
+          - action: input_boolean.turn_on
+            target:
+              entity_id: input_boolean.wr1_vor_netzladen_akku_halten
+          else:
+          - action: input_boolean.turn_off
+            target:
+              entity_id: input_boolean.wr1_vor_netzladen_akku_halten
+          note: Nur ein MANUELLES Halten merken. Ein Halten durch den Autoladen-Schutz
+            zaehlt bei der Freigabe ueber den Schutz selbst (nur wenn er dann noch
+            an ist) - sonst blieb der Akku nach Ladeende des Autos haengen (25./26.10.2026).
+        - action: script.sungrow_akku_modus
+          data:
+            wr: WR1
+            modus: laden
+          continue_on_error: true
+      - if:
+        - condition: numeric_state
+          entity_id: sensor.wr2_battery_level
+          below: input_number.zwangsladen_ziel_soc
+        - condition: not
+          conditions:
+          - condition: state
+            entity_id: sensor.wr2_akku_modus
+            state: Zwangsladen
+        then:
+        - if:
+          - condition: state
+            entity_id: sensor.wr2_akku_modus
+            state: Akku halten
+          - condition: state
+            entity_id: input_boolean.akku_halten_durch_plan
+            state: 'off'
+          - condition: state
+            entity_id: binary_sensor.akku_schutz_autoladen
+            state: 'off'
+          then:
+          - action: input_boolean.turn_on
+            target:
+              entity_id: input_boolean.wr2_vor_netzladen_akku_halten
+          else:
+          - action: input_boolean.turn_off
+            target:
+              entity_id: input_boolean.wr2_vor_netzladen_akku_halten
+          note: Nur ein MANUELLES Halten merken. Ein Halten durch den Autoladen-Schutz
+            zaehlt bei der Freigabe ueber den Schutz selbst (nur wenn er dann noch
+            an ist) - sonst blieb der Akku nach Ladeende des Autos haengen (25./26.10.2026).
+        - action: script.sungrow_akku_modus
+          data:
+            wr: WR2
+            modus: laden
+          continue_on_error: true
+      - action: input_boolean.turn_off
+        target:
+          entity_id: input_boolean.akku_halten_durch_plan
+    - alias: 'Halten: Akku fuer teurere Viertelstunden aufheben'
+      conditions:
+      - condition: state
+        entity_id: sensor.netzladeplan
+        state: halten
+      sequence:
+      - choose:
+        - conditions:
+          - condition: state
+            entity_id: input_boolean.netzladen_durch_automatik
+            state: 'on'
+          sequence:
+          - if:
+            - condition: state
+              entity_id: sensor.wr1_akku_modus
+              state: Zwangsladen
+            then:
+            - action: script.sungrow_akku_modus
+              data:
+                wr: WR1
+                modus: halten
+              continue_on_error: true
+          - if:
+            - condition: state
+              entity_id: sensor.wr2_akku_modus
+              state: Zwangsladen
+            then:
+            - action: script.sungrow_akku_modus
+              data:
+                wr: WR2
+                modus: halten
+              continue_on_error: true
+          - action: input_boolean.turn_off
+            target:
+              entity_id: input_boolean.netzladen_durch_automatik
+          - action: input_boolean.turn_on
+            target:
+              entity_id: input_boolean.akku_halten_durch_plan
+          note: 'Eigenes Laden ist fertig: direkt ins Halten (Merker vor_netzladen
+            bleiben fuer die spaetere Freigabe)'
+        - conditions:
+          - condition: state
+            entity_id: sensor.wr1_akku_modus
+            state: Normalbetrieb
+          - condition: state
+            entity_id: sensor.wr2_akku_modus
+            state: Normalbetrieb
+          - condition: state
+            entity_id: input_boolean.akku_halten_pause_fur_pv_uberschuss
+            state: 'off'
+          sequence:
+          - action: script.sungrow_akku_modus
+            data:
+              wr: WR1
+              modus: halten
+            continue_on_error: true
+          - action: script.sungrow_akku_modus
+            data:
+              wr: WR2
+              modus: halten
+            continue_on_error: true
+          - action: input_boolean.turn_off
+            target:
+              entity_id:
+              - input_boolean.wr1_vor_netzladen_akku_halten
+              - input_boolean.wr2_vor_netzladen_akku_halten
+          - action: input_boolean.turn_on
+            target:
+              entity_id: input_boolean.akku_halten_durch_plan
+          note: 'Nicht waehrend einer PV-Pause: dann nimmt der Akku gerade Ueberschuss
+            auf, zurueck ins Halten schaltet ''PV-Ueberschuss trotz Halten in den
+            Akku'''
+        note: Haelt schon jemand (von Hand oder Autoladen-Schutz), bleibt alles wie
+          es ist
+    default:
+    - if:
+      - condition: state
+        entity_id: input_boolean.netzladen_durch_automatik
+        state: 'on'
+      then:
+      - if:
+        - condition: or
+          conditions:
+          - condition: state
+            entity_id: sensor.wr1_akku_modus
+            state: Zwangsladen
+          - condition: state
+            entity_id: sensor.wr2_akku_modus
+            state: Zwangsladen
+        then:
+        - if:
+          - condition: or
+            conditions:
+            - condition: state
+              entity_id: input_boolean.wr1_vor_netzladen_akku_halten
+              state: 'on'
+            - condition: state
+              entity_id: input_boolean.wr2_vor_netzladen_akku_halten
+              state: 'on'
+            - condition: state
+              entity_id: binary_sensor.akku_schutz_autoladen
+              state: 'on'
+          then:
+          - if:
+            - condition: state
+              entity_id: sensor.wr1_akku_modus
+              state: Zwangsladen
+            then:
+            - action: script.sungrow_akku_modus
+              data:
+                wr: WR1
+                modus: halten
+              continue_on_error: true
+          - if:
+            - condition: state
+              entity_id: sensor.wr2_akku_modus
+              state: Zwangsladen
+            then:
+            - action: script.sungrow_akku_modus
+              data:
+                wr: WR2
+                modus: halten
+              continue_on_error: true
+          else:
+          - action: script.sungrow_akku_modus
+            data:
+              wr: WR1
+              modus: normal
+            continue_on_error: true
+          note: 'Beide WR teilen den EMS-Modus: entweder beide halten oder beide normal.
+            Halten, wenn einer vorher hielt oder der Akkuschutz fuers Autoladen aktiv
+            ist; Normalbetrieb setzt das Skript fuer beide.'
+      - action: input_boolean.turn_off
+        target:
+          entity_id: input_boolean.netzladen_durch_automatik
+      - action: input_boolean.turn_off
+        target:
+          entity_id:
+          - input_boolean.wr1_vor_netzladen_akku_halten
+          - input_boolean.wr2_vor_netzladen_akku_halten
+    - if:
+      - condition: state
+        entity_id: input_boolean.akku_halten_durch_plan
+        state: 'on'
+      then:
+      - if:
+        - condition: or
+          conditions:
+          - condition: state
+            entity_id: sensor.wr1_akku_modus
+            state: Akku halten
+          - condition: state
+            entity_id: sensor.wr2_akku_modus
+            state: Akku halten
+        - condition: not
+          conditions:
+          - condition: or
+            conditions:
+            - condition: state
+              entity_id: input_boolean.wr1_vor_netzladen_akku_halten
+              state: 'on'
+            - condition: state
+              entity_id: input_boolean.wr2_vor_netzladen_akku_halten
+              state: 'on'
+            - condition: state
+              entity_id: binary_sensor.akku_schutz_autoladen
+              state: 'on'
+        then:
+        - action: script.sungrow_akku_modus
+          data:
+            wr: WR1
+            modus: normal
+          continue_on_error: true
+        note: Normalbetrieb setzt das Skript fuer beide WR; hielt vorher jemand von
+          Hand oder der Autoladen-Schutz, bleibt der Akku gehalten
+      - action: input_boolean.turn_off
+        target:
+          entity_id: input_boolean.akku_halten_durch_plan
+      - action: input_boolean.turn_off
+        target:
+          entity_id:
+          - input_boolean.wr1_vor_netzladen_akku_halten
+          - input_boolean.wr2_vor_netzladen_akku_halten
+  mode: single
+  max_exceeded: silent
+- id: preis_automatik_halten_pv_pause
+  alias: 'Preis-Automatik: PV-Überschuss trotz Halten in den Akku'
+  description: Hält der Ladeplan die Akkus (input_boolean.akku_halten_durch_plan),
+    würde ein PV-Überschuss ins Netz gehen, weil 'Akku halten' auch nicht aus der
+    PV lädt. Ab 500 W Einspeisung für 5 min daher vorübergehend Normalbetrieb (Pause),
+    damit die Akkus den Überschuss bekommen. Entladen die Akkus danach 10 min lang
+    mit über 300 W (Sonne weg) und der Plan sagt weiter 'halten', zurück auf 'Akku
+    halten'. Kurze oder kleine Überschüsse bleiben unbeachtet.
+  triggers:
+  - trigger: numeric_state
+    entity_id: sensor.export_power
+    above: 500
+    for:
+      minutes: 5
+    id: pv_ueberschuss
+  - trigger: numeric_state
+    entity_id: sensor.sum_battery_discharging_power
+    above: 300
+    for:
+      minutes: 10
+    id: pv_weg
+  - trigger: state
+    entity_id: input_boolean.akku_halten_durch_plan
+    to: 'off'
+    id: plan_ende
+  - trigger: state
+    entity_id: input_boolean.akku_halten_durch_plan
+    to: 'on'
+    for:
+      minutes: 5
+    id: pv_ueberschuss
+    note: Falls beim Beginn des Haltens schon eingespeist wird (dann gibt es keinen
+      neuen Uebergang ueber 500 W)
+  conditions: []
+  actions:
+  - choose:
+    - alias: 'PV-Überschuss: Pause, Akkus nehmen ihn auf'
+      conditions:
+      - condition: trigger
+        id: pv_ueberschuss
+      - condition: state
+        entity_id: input_boolean.akku_halten_durch_plan
+        state: 'on'
+      - condition: state
+        entity_id: input_boolean.akku_halten_pause_fur_pv_uberschuss
+        state: 'off'
+      - condition: or
+        conditions:
+        - condition: state
+          entity_id: sensor.wr1_akku_modus
+          state: Akku halten
+        - condition: state
+          entity_id: sensor.wr2_akku_modus
+          state: Akku halten
+      - condition: numeric_state
+        entity_id: sensor.export_power
+        above: 500
+      sequence:
+      - action: input_boolean.turn_on
+        target:
+          entity_id: input_boolean.akku_halten_pause_fur_pv_uberschuss
+      - action: script.sungrow_akku_modus
+        data:
+          wr: WR1
+          modus: normal
+        continue_on_error: true
+        note: Normalbetrieb gilt für beide WR (gemeinsamer EMS-Modus)
+    - alias: 'Sonne weg, Netz noch günstig: wieder halten'
+      conditions:
+      - condition: trigger
+        id: pv_weg
+      - condition: state
+        entity_id: input_boolean.akku_halten_durch_plan
+        state: 'on'
+      - condition: state
+        entity_id: input_boolean.akku_halten_pause_fur_pv_uberschuss
+        state: 'on'
+      - condition: state
+        entity_id: sensor.netzladeplan
+        state: halten
+      sequence:
+      - action: script.sungrow_akku_modus
+        data:
+          wr: WR1
+          modus: halten
+        continue_on_error: true
+      - action: script.sungrow_akku_modus
+        data:
+          wr: WR2
+          modus: halten
+        continue_on_error: true
+      - action: input_boolean.turn_off
+        target:
+          entity_id: input_boolean.akku_halten_pause_fur_pv_uberschuss
+    - alias: 'Plan hält nicht mehr: Pause aufräumen'
+      conditions:
+      - condition: trigger
+        id: plan_ende
+      sequence:
+      - action: input_boolean.turn_off
+        target:
+          entity_id: input_boolean.akku_halten_pause_fur_pv_uberschuss
+  mode: queued
+  max: 3
+- id: preis_automatik_akku_schutz_autoladen
+  alias: 'Preis-Automatik: Hausakku schützen beim Autoladen'
+  description: 'Ganzjährig: Lädt ein Auto zu Hause, reicht die PV nicht für das Auto
+    UND ist der Hausakku knapp (Ø SoC unter ''Akku-Schutz Min-SoC'' und die restliche
+    PV-Prognose bringt ihn heute nicht mehr auf ''Akku-Schutz Ziel aus PV''), gehen
+    die Hausakkus im Normalbetrieb auf ''Akku halten''. Sonst darf der Hausakku das
+    Auto mitversorgen. Logik: binary_sensor.akku_schutz_autoladen. Zwangsladen hat
+    Vorrang; ein manuelles ''Normal'' aus ''Akku halten'' heraus wird respektiert.
+    Beendet wird das Halten von ''Sungrow: Akku halten beenden''.'
+  triggers:
+  - trigger: state
+    entity_id: binary_sensor.akku_schutz_autoladen
+    to: 'on'
+  - trigger: state
+    entity_id:
+    - sensor.wr1_akku_modus
+    - sensor.wr2_akku_modus
+    to: Normalbetrieb
+    not_from:
+    - Akku halten
+    for:
+      minutes: 1
+  - trigger: state
+    entity_id: input_boolean.preis_automatik
+    to: 'on'
+  conditions:
+  - condition: state
+    entity_id: input_boolean.preis_automatik
+    state: 'on'
+  - condition: state
+    entity_id: binary_sensor.akku_schutz_autoladen
+    state: 'on'
+  actions:
+  - if:
+    - condition: state
+      entity_id: sensor.wr1_akku_modus
+      state: Normalbetrieb
+    then:
+    - action: script.sungrow_akku_modus
+      data:
+        wr: WR1
+        modus: halten
+      continue_on_error: true
+  - if:
+    - condition: state
+      entity_id: sensor.wr2_akku_modus
+      state: Normalbetrieb
+    then:
+    - action: script.sungrow_akku_modus
+      data:
+        wr: WR2
+        modus: halten
+      continue_on_error: true
+  mode: queued
+  max: 3

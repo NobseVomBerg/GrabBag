@@ -1,0 +1,56 @@
+# Strompreis effektiv: Bezugskosten / kWh je Monat und übers Jahr - Grundlage für karte_strompreis_effektiv.yaml (Package)
+# Aus https://github.com/NobseVomBerg/GrabBag - MIT-Lizenz, ohne Gewähr. Entity-IDs an die eigene Anlage anpassen.
+#
+# Quellen:
+#   sensor.total_imported_energy          Netzbezug gesamt (kWh, Zähler am WR1)
+#   sensor.sum_daily_imported_energy_cost Kostensensor, den das Energie-Dashboard selbst anlegt, wenn beim
+#                                         Netzbezug "Entität mit aktuellem Preis" (Tibber-Preis) gewählt ist.
+#                                         Der Name hängt an deinem Bezugssensor: <bezugssensor>_cost.
+# Bei mir sind das UI-Helfer (Verbrauchszähler + Template). Der Zähler "Stromjahr" setzt nie zurück:
+# nach 12 Monaten auswerten und dann per Aktion utility_meter.calibrate auf 0 setzen.
+
+utility_meter:
+  netzbezug_monat:
+    name: Netzbezug Monat
+    source: sensor.total_imported_energy
+    cycle: monthly
+    periodically_resetting: false     # Gesamtzähler: ein Aussetzer auf 0 soll nicht als Verbrauch zählen
+  stromkosten_monat:
+    name: Stromkosten Monat
+    source: sensor.sum_daily_imported_energy_cost
+    cycle: monthly
+    periodically_resetting: true      # der Kostensensor beginnt jeden Tag bei 0
+  netzbezug_stromjahr:
+    name: Netzbezug Stromjahr
+    source: sensor.total_imported_energy
+    periodically_resetting: false
+  stromkosten_stromjahr:
+    name: Stromkosten Stromjahr
+    source: sensor.sum_daily_imported_energy_cost
+    periodically_resetting: true
+
+template:
+  - sensor:
+      - name: Strompreis effektiv Monat
+        unique_id: strompreis_effektiv_monat
+        unit_of_measurement: "EUR/kWh"
+        state_class: measurement
+        icon: mdi:cash-clock
+        availability: "{{ has_value('sensor.stromkosten_monat') and states('sensor.netzbezug_monat') | float(0) >= 2 }}"
+        state: "{{ (states('sensor.stromkosten_monat') | float(0) / states('sensor.netzbezug_monat') | float(1)) | round(3) }}"
+      - name: Strompreis effektiv Vormonat
+        unique_id: strompreis_effektiv_vormonat
+        unit_of_measurement: "EUR/kWh"
+        state_class: measurement
+        icon: mdi:cash-clock
+        availability: "{{ state_attr('sensor.netzbezug_monat', 'last_period') | float(0) >= 2 }}"
+        state: >-
+          {{ (state_attr('sensor.stromkosten_monat', 'last_period') | float(0)
+              / state_attr('sensor.netzbezug_monat', 'last_period') | float(1)) | round(3) }}
+      - name: Strompreis effektiv Stromjahr
+        unique_id: strompreis_effektiv_stromjahr
+        unit_of_measurement: "EUR/kWh"
+        state_class: measurement
+        icon: mdi:cash-clock
+        availability: "{{ has_value('sensor.stromkosten_stromjahr') and states('sensor.netzbezug_stromjahr') | float(0) >= 2 }}"
+        state: "{{ (states('sensor.stromkosten_stromjahr') | float(0) / states('sensor.netzbezug_stromjahr') | float(1)) | round(3) }}"

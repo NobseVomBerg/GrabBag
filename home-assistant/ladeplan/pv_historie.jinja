@@ -1,0 +1,15 @@
+{#
+  Actual daily PV yield of the plant (kWh) per calendar day: [mean, max] within +-10 days.
+  EMPTY PLACEHOLDER: the table depends on the plant and its shading, so this copy holds no data. pv_hist() then
+  returns {} for every day and the charge plan (netzladeplan.jinja) skips the cap at the best real day of the season.
+  Fill it with your own yields: tools/pv_historie.py generates this file from the long-term statistics of the daily
+  PV generation. A filled table looks like this (made-up values for a 10 kWp plant):
+      '06-20': [45.0, 60.0],
+      '06-21': [45.2, 60.0]
+  pv_hist(datum) returns JSON {"mittel": .., "max": ..} or {} when there is no data for that day.
+#}
+{% macro pv_hist(datum) -%}
+{%- set t = {} -%}
+{%- set w = t.get(datum.strftime('%m-%d')) -%}
+{{- ({'mittel': w[0], 'max': w[1]} if w else {}) | tojson -}}
+{%- endmacro %}

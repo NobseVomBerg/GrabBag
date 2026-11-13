@@ -1,0 +1,88 @@
+# Ladeplan: Helfer und Statistik-Sensoren für netzladeplan.jinja und energie_automatik.yaml (Package)
+# Aus https://github.com/NobseVomBerg/GrabBag - MIT-Lizenz, ohne Gewähr. Entity-IDs an die eigene Anlage anpassen.
+#
+# Bei mir sind das UI-Helfer. Als Package einbinden (configuration.yaml: homeassistant: packages:
+# !include_dir_named packages, Datei nach packages/) oder in der UI mit denselben Namen anlegen.
+# Die Werte in den Kommentaren sind meine Einstellungen.
+
+input_number:
+  max_ladepreis_netz:            # teurer wird nie aus dem Netz geladen - bei mir 0,65 €/kWh
+    name: Max. Ladepreis Netz
+    min: 0.05
+    max: 1
+    step: 0.01
+    mode: box
+    unit_of_measurement: "€/kWh"
+    icon: mdi:cash-lock
+  mindestvorteil_netzladen:      # Laden lohnt erst ab diesem Abstand (nach Verlusten) - bei mir 0,05 €/kWh
+    name: Mindestvorteil Netzladen
+    min: 0
+    max: 0.2
+    step: 0.01
+    mode: box
+    unit_of_measurement: "€/kWh"
+    icon: mdi:scale-balance
+  hausverbrauch_pro_tag:         # Rückfallwert, solange es noch keinen Durchschnitt gibt - bei mir 17 kWh
+    name: Hausverbrauch pro Tag
+    min: 5
+    max: 40
+    step: 1
+    mode: box
+    unit_of_measurement: kWh
+    icon: mdi:home-lightning-bolt
+  akku_schutz_min_soc:           # Akku-Schutz beim Autoladen greift unter diesem SoC - bei mir 50 %
+    name: Akku-Schutz Min-SoC
+    min: 10
+    max: 100
+    step: 5
+    mode: box
+    unit_of_measurement: "%"
+    icon: mdi:battery-heart-variant
+  akku_schutz_ziel_aus_pv:       # ... außer die PV bringt den Akku heute noch hierhin - bei mir 60 %
+    name: Akku-Schutz Ziel aus PV
+    min: 10
+    max: 100
+    step: 5
+    mode: box
+    unit_of_measurement: "%"
+    icon: mdi:solar-power-variant
+
+template:
+  - binary_sensor:
+      # Wann der Plan aus dem Netz laden darf (Oktober bis Mitte Februar) - sonst nur PV
+      - name: Netzladen-Saison
+        unique_id: netzladen_saison
+        state: "{{ now().month >= 10 or now().month == 1 or (now().month == 2 and now().day <= 15) }}"
+
+sensor:
+  # echte PV-Leistung der letzten 20 Minuten (Deckel 2 im Plan: das Modell darf nicht weit darüber liegen)
+  - platform: statistics
+    name: PV-Leistung 20 Minuten
+    unique_id: pv_leistung_20_minuten
+    entity_id: sensor.sum_total_dc_power
+    state_characteristic: average_step
+    max_age:
+      minutes: 20
+    sampling_size: 5000
+    keep_last_sample: true
+    precision: 0
+  # Planungs-Verbrauch: 14-Tage-Schnitt ohne die Autos (sensor.hausverbrauch_ohne_autos aus energie_automatik.yaml)
+  - platform: statistics
+    name: Hausverbrauch ohne Autos 14 Tage
+    unique_id: hausverbrauch_ohne_autos_14_tage
+    entity_id: sensor.hausverbrauch_ohne_autos
+    state_characteristic: average_step
+    max_age:
+      days: 14
+    sampling_size: 400000
+    precision: 0
+  # Rückfall, solange der 14-Tage-Schnitt noch nicht genug Daten hat
+  - platform: statistics
+    name: Hausverbrauch 3 Tage
+    unique_id: hausverbrauch_3_tage
+    entity_id: sensor.house_without_wallbox_power
+    state_characteristic: average_step
+    max_age:
+      hours: 72
+    sampling_size: 150000
+    precision: 0

@@ -1,0 +1,649 @@
+# Sungrow: zwei Hausakkus (Sungrow SH-RT) steuern und absichern
+# Aus https://github.com/NobseVomBerg/GrabBag - MIT-Lizenz, ohne Gewähr. Entity-IDs an die eigene Anlage anpassen.
+#
+# Automationen:
+#   - Zwangsladen nachregeln: Ladeleistung alle 30 s so verteilen, dass Netzbezug und stärkste Phase
+#     unter Budget und Phasengrenze bleiben (Haus und Auto eingerechnet)
+#   - Schutz Phasenlast / Schutz Budget: Notbremsen, falls das Nachregeln nicht reicht
+#   - Zwangsladen bis Ziel-SoC: beendet das Laden je Wechselrichter am Ziel, danach Halten oder Normalbetrieb
+#   - Zwangsladen nach HA-Neustart beenden: kein unbeaufsichtigtes Laden nach einem Neustart
+#   - Akku halten beenden: Halten fürs Autoladen bzw. manuelles Halten wieder aufheben
+#   - Backup-Reserve WR1 setzen / übernehmen: Regler <-> Register 13100 synchron halten
+#
+# Braucht:
+#   - Modbus-Sensoren aus ../sungrow-modbus/ (WR1 mit Netzzähler, WR2 ohne)
+#   - script.sungrow_akku_modus aus scripts_sungrow.yaml
+#   - Helfer und Template-Sensoren aus helfer_sungrow.yaml
+#   - binary_sensor.akku_schutz_autoladen und sensor.autoladeleistung aus ../ladeplan/energie_automatik.yaml
+#     (Hausakku beim Autoladen schützen). Ohne Auto: als Template-Sensoren mit festem 'off' bzw. 0 anlegen.
+#
+# Einbinden: in der UI je Automation neu anlegen, "In YAML bearbeiten" und den Block einfügen
+# (bleibt in der UI editierbar). Oder die ganze Datei in configuration.yaml einbinden:
+#   automation sungrow: !include automations_sungrow.yaml
+# (dann in der UI nur lesbar).
+
+- id: sungrow_zwangsladen_nachregeln
+  alias: 'Sungrow: Zwangsladen nachregeln'
+  description: 'Regelt die Leistung laufender Zwangsladungen alle 30 Sekunden (und
+    sofort bei Überschreitung) so nach, dass Netzbezug unter dem Budget und die stärkste
+    Phase unter der Grenze bleiben - inkl. Auto und Haus. Die freie Leistung wird
+    gleichmäßig auf die ladenden Akkus verteilt, höchstens ''Zwangsladen Leistung''
+    je Akku. Unter 300 W wird auf 0 W gestellt (Akku wartet im Zwangslade-Modus und
+    lädt weiter, sobald wieder Luft ist). Schreibt nur Register 13052 (Leistung).
+    Netzbezug und Phasenströme kommen vom Netzzähler, die PV ist dort schon abgezogen:
+    frei = Budget + PV - Haus - Auto.'
+  triggers:
+  - trigger: time_pattern
+    seconds: /30
+  - trigger: numeric_state
+    entity_id: sensor.import_power
+    above: input_number.ladebudget_gesamt
+    for:
+      seconds: 5
+  - trigger: numeric_state
+    entity_id: sensor.netz_max_phasenstrom
+    above: input_number.netz_phasengrenze
+    for:
+      seconds: 5
+  conditions:
+  - condition: or
+    conditions:
+    - condition: state
+      entity_id: sensor.wr1_akku_modus
+      state: Zwangsladen
+    - condition: state
+      entity_id: sensor.wr2_akku_modus
+      state: Zwangsladen
+  actions:
+  - variables:
+      lade1: '{{ is_state(''sensor.wr1_akku_modus'', ''Zwangsladen'') }}'
+      lade2: '{{ is_state(''sensor.wr2_akku_modus'', ''Zwangsladen'') }}'
+      eigen_w: '{{ (states(''sensor.battery_charging_power'') | float(0) if lade1
+        else 0) + (states(''sensor.wr2_battery_charging_power'') | float(0) if lade2
+        else 0) }}'
+      frei_w: '{% set budget = states(''input_number.ladebudget_gesamt'') | float(15000)
+        - (states(''sensor.import_power'') | float(99999) - eigen_w) - 300 %}{% set
+        phase = (states(''input_number.netz_phasengrenze'') | float(25) - 0.5 - (states(''sensor.netz_max_phasenstrom'')
+        | float(99) - eigen_w / 690)) * 690 %}{{ [[budget, phase] | min, 0] | max
+        }}'
+      soll: '{% set p = (([states(''input_number.zwangsladen_leistung'') | float(5000),
+        frei_w / ((1 if lade1 else 0) + (1 if lade2 else 0))] | min) / 100) | round(0,
+        ''floor'') | int * 100 %}{{ p if p >= 300 else 0 }}'
+  - if:
+    - condition: template
+      value_template: '{{ lade1 and (soll - states(''sensor.battery_forced_charge_discharge_power'')
+        | float(0)) | abs >= 300 }}'
+    then:
+    - action: modbus.write_register
+      data:
+        hub: WR1 SungrowSHx
+        slave: 1
+        address: 13051
+        value: '{{ soll }}'
+      continue_on_error: true
+  - if:
+    - condition: template
+      value_template: '{{ lade2 and (soll - states(''sensor.wr2_battery_forced_charge_discharge_power'')
+        | float(0)) | abs >= 300 }}'
+    then:
+    - action: modbus.write_register
+      data:
+        hub: WR2 SungrowSHx
+        slave: 2
+        address: 13051
+        value: '{{ soll }}'
+      continue_on_error: true
+  mode: single
+  max_exceeded: silent
+- id: sungrow_schutz_phasenlast
+  alias: 'Sungrow Schutz: Phasenlast'
+  description: 'Notbremse: Beendet Zwangsladen, wenn eine Phase am eigenen Zähler
+    45 Sekunden über der Grenze liegt - obwohl ''Zwangsladen nachregeln'' die Leistung
+    schon zurücknimmt.'
+  triggers:
+  - trigger: numeric_state
+    entity_id: sensor.netz_max_phasenstrom
+    above: input_number.netz_phasengrenze
+    for:
+      seconds: 45
+  conditions:
+  - condition: or
+    conditions:
+    - condition: and
+      conditions:
+      - condition: state
+        entity_id: sensor.battery_forced_charge_discharge_cmd
+        state: Forced charge
+      - condition: state
+        entity_id: sensor.ems_mode_selection
+        state: Forced mode
+    - condition: and
+      conditions:
+      - condition: state
+        entity_id: sensor.wr2_battery_forced_charge_discharge_cmd
+        state: Forced charge
+      - condition: state
+        entity_id: sensor.wr2_ems_mode_selection
+        state: Forced mode
+  actions:
+  - if:
+    - condition: and
+      conditions:
+      - condition: state
+        entity_id: sensor.battery_forced_charge_discharge_cmd
+        state: Forced charge
+      - condition: state
+        entity_id: sensor.ems_mode_selection
+        state: Forced mode
+    then:
+    - action: script.sungrow_akku_modus
+      data:
+        wr: WR1
+        modus: normal
+  - if:
+    - condition: and
+      conditions:
+      - condition: state
+        entity_id: sensor.wr2_battery_forced_charge_discharge_cmd
+        state: Forced charge
+      - condition: state
+        entity_id: sensor.wr2_ems_mode_selection
+        state: Forced mode
+    then:
+    - action: script.sungrow_akku_modus
+      data:
+        wr: WR2
+        modus: normal
+  - action: persistent_notification.create
+    data:
+      title: 'Zwangsladen beendet: Phasenlast'
+      message: Stärkste Phase {{ states('sensor.netz_max_phasenstrom') }} A über {{
+        states('input_number.netz_phasengrenze') | int }} A.
+      notification_id: sungrow_schutz_phasenlast
+  mode: single
+- id: sungrow_schutz_budget
+  alias: 'Sungrow Schutz: Budget Netzbezug'
+  description: 'Notbremse: Liegt der gesamte Netzbezug (eigener Zähler) während des
+    Zwangsladens 90 Sekunden über dem Budget - obwohl ''Zwangsladen nachregeln'' die
+    Leistung schon zurücknimmt -, wird zuerst WR2 und falls nötig auch WR1 zurück
+    in den Normalbetrieb gesetzt.'
+  triggers:
+  - trigger: numeric_state
+    entity_id: sensor.import_power
+    above: input_number.ladebudget_gesamt
+    for:
+      seconds: 90
+  conditions:
+  - condition: or
+    conditions:
+    - condition: and
+      conditions:
+      - condition: state
+        entity_id: sensor.battery_forced_charge_discharge_cmd
+        state: Forced charge
+      - condition: state
+        entity_id: sensor.ems_mode_selection
+        state: Forced mode
+    - condition: and
+      conditions:
+      - condition: state
+        entity_id: sensor.wr2_battery_forced_charge_discharge_cmd
+        state: Forced charge
+      - condition: state
+        entity_id: sensor.wr2_ems_mode_selection
+        state: Forced mode
+  actions:
+  - if:
+    - condition: and
+      conditions:
+      - condition: state
+        entity_id: sensor.wr2_battery_forced_charge_discharge_cmd
+        state: Forced charge
+      - condition: state
+        entity_id: sensor.wr2_ems_mode_selection
+        state: Forced mode
+    then:
+    - action: script.sungrow_akku_modus
+      data:
+        wr: WR2
+        modus: normal
+    - delay:
+        seconds: 30
+  - if:
+    - condition: numeric_state
+      entity_id: sensor.import_power
+      above: input_number.ladebudget_gesamt
+    - condition: and
+      conditions:
+      - condition: state
+        entity_id: sensor.battery_forced_charge_discharge_cmd
+        state: Forced charge
+      - condition: state
+        entity_id: sensor.ems_mode_selection
+        state: Forced mode
+    then:
+    - action: script.sungrow_akku_modus
+      data:
+        wr: WR1
+        modus: normal
+  - action: persistent_notification.create
+    data:
+      title: 'Zwangsladen reduziert: Budget'
+      message: Netzbezug lag über {{ states('input_number.ladebudget_gesamt') | int
+        }} W. Zwangsladen wurde beendet (zuerst WR2).
+      notification_id: sungrow_schutz_budget
+  mode: single
+- id: sungrow_zwangsladen_ziel_soc
+  alias: 'Sungrow: Zwangsladen bis Ziel-SoC'
+  description: 'Beendet das Zwangsladen eines Wechselrichters, sobald sein Akku den
+    Ziel-SoC erreicht. Beide WR teilen den EMS-Modus: Lädt der andere noch, wird dieser
+    nur auf Halten (Stop) gestellt; sonst Halten, wenn vorher gehalten wurde (input_boolean.wr1/wr2_vor_netzladen_akku_halten)
+    oder der Akkuschutz fürs Autoladen aktiv ist. Hat der Ladeplan geladen (input_boolean.netzladen_durch_automatik),
+    ebenfalls Halten - das Halten gehört dann dem Plan (input_boolean.akku_halten_durch_plan),
+    der die Akkus erst freigibt, wenn sich das Entladen lohnt (Wunsch 09.11.2026:
+    nach der Zwangsladung weiter halten, notfalls Stunden, spätestens bei PV-Überschuss
+    frei). Nach einer manuellen Ladung Normalbetrieb.'
+  triggers:
+  - trigger: numeric_state
+    entity_id: sensor.battery_level
+    above: input_number.zwangsladen_ziel_soc
+    id: WR1
+  - trigger: numeric_state
+    entity_id: sensor.wr2_battery_level
+    above: input_number.zwangsladen_ziel_soc
+    id: WR2
+  conditions: []
+  actions:
+  - choose:
+    - conditions:
+      - condition: trigger
+        id: WR1
+      - condition: and
+        conditions:
+        - condition: state
+          entity_id: sensor.battery_forced_charge_discharge_cmd
+          state: Forced charge
+        - condition: state
+          entity_id: sensor.ems_mode_selection
+          state: Forced mode
+      sequence:
+      - if:
+        - condition: state
+          entity_id: sensor.wr2_akku_modus
+          state: Zwangsladen
+        then:
+        - action: script.sungrow_akku_modus
+          data:
+            wr: WR1
+            modus: halten
+        else:
+        - if:
+          - condition: or
+            conditions:
+            - condition: state
+              entity_id: input_boolean.wr1_vor_netzladen_akku_halten
+              state: 'on'
+            - condition: state
+              entity_id: input_boolean.wr2_vor_netzladen_akku_halten
+              state: 'on'
+            - condition: state
+              entity_id: binary_sensor.akku_schutz_autoladen
+              state: 'on'
+          then:
+          - action: script.sungrow_akku_modus
+            data:
+              wr: WR1
+              modus: halten
+          else:
+          - if:
+            - condition: state
+              entity_id: input_boolean.netzladen_durch_automatik
+              state: 'on'
+            then:
+            - action: script.sungrow_akku_modus
+              data:
+                wr: WR1
+                modus: halten
+            - action: input_boolean.turn_on
+              target:
+                entity_id: input_boolean.akku_halten_durch_plan
+            else:
+            - action: script.sungrow_akku_modus
+              data:
+                wr: WR1
+                modus: normal
+            note: 'Ladung vom Plan: erst halten und das Halten dem Plan uebergeben
+              - er gibt die Akkus frei, sobald sich das Entladen lohnt (spaetestens
+              bei PV-Ueberschuss). Manuelle Ladung: Normalbetrieb.'
+        note: 'Gemeinsamer EMS-Modus: laedt der andere WR noch, nur diesen auf Halten
+          (Stop) stellen, sonst wuerde Normalbetrieb auch dessen Laden beenden. Danach
+          halten, wenn vorher gehalten wurde oder der Akkuschutz fuers Autoladen aktiv
+          ist.'
+    - conditions:
+      - condition: trigger
+        id: WR2
+      - condition: and
+        conditions:
+        - condition: state
+          entity_id: sensor.wr2_battery_forced_charge_discharge_cmd
+          state: Forced charge
+        - condition: state
+          entity_id: sensor.wr2_ems_mode_selection
+          state: Forced mode
+      sequence:
+      - if:
+        - condition: state
+          entity_id: sensor.wr1_akku_modus
+          state: Zwangsladen
+        then:
+        - action: script.sungrow_akku_modus
+          data:
+            wr: WR2
+            modus: halten
+        else:
+        - if:
+          - condition: or
+            conditions:
+            - condition: state
+              entity_id: input_boolean.wr1_vor_netzladen_akku_halten
+              state: 'on'
+            - condition: state
+              entity_id: input_boolean.wr2_vor_netzladen_akku_halten
+              state: 'on'
+            - condition: state
+              entity_id: binary_sensor.akku_schutz_autoladen
+              state: 'on'
+          then:
+          - action: script.sungrow_akku_modus
+            data:
+              wr: WR2
+              modus: halten
+          else:
+          - if:
+            - condition: state
+              entity_id: input_boolean.netzladen_durch_automatik
+              state: 'on'
+            then:
+            - action: script.sungrow_akku_modus
+              data:
+                wr: WR2
+                modus: halten
+            - action: input_boolean.turn_on
+              target:
+                entity_id: input_boolean.akku_halten_durch_plan
+            else:
+            - action: script.sungrow_akku_modus
+              data:
+                wr: WR2
+                modus: normal
+            note: 'Ladung vom Plan: erst halten und das Halten dem Plan uebergeben
+              - er gibt die Akkus frei, sobald sich das Entladen lohnt (spaetestens
+              bei PV-Ueberschuss). Manuelle Ladung: Normalbetrieb.'
+        note: 'Gemeinsamer EMS-Modus: laedt der andere WR noch, nur diesen auf Halten
+          (Stop) stellen, sonst wuerde Normalbetrieb auch dessen Laden beenden. Danach
+          halten, wenn vorher gehalten wurde oder der Akkuschutz fuers Autoladen aktiv
+          ist.'
+  mode: queued
+- id: sungrow_zwangsladen_nach_neustart_beenden
+  alias: 'Sungrow: Zwangsladen nach HA-Neustart beenden'
+  description: 'Nach einem Neustart von Home Assistant läuft kein Zwangsladen unbeaufsichtigt
+    weiter. Beide WR teilen den EMS-Modus: zurück auf ''Akku halten'', wenn vorher
+    gehalten wurde oder der Akkuschutz fürs Autoladen aktiv ist, sonst Normalbetrieb
+    für beide. ''Akku halten'' bleibt bestehen.'
+  triggers:
+  - trigger: homeassistant
+    event: start
+  conditions: []
+  actions:
+  - delay:
+      seconds: 60
+  - if:
+    - condition: or
+      conditions:
+      - condition: and
+        conditions:
+        - condition: state
+          entity_id: sensor.battery_forced_charge_discharge_cmd
+          state: Forced charge
+        - condition: state
+          entity_id: sensor.ems_mode_selection
+          state: Forced mode
+      - condition: and
+        conditions:
+        - condition: state
+          entity_id: sensor.wr2_battery_forced_charge_discharge_cmd
+          state: Forced charge
+        - condition: state
+          entity_id: sensor.wr2_ems_mode_selection
+          state: Forced mode
+    then:
+    - if:
+      - condition: or
+        conditions:
+        - condition: state
+          entity_id: input_boolean.wr1_vor_netzladen_akku_halten
+          state: 'on'
+        - condition: state
+          entity_id: input_boolean.wr2_vor_netzladen_akku_halten
+          state: 'on'
+        - condition: state
+          entity_id: binary_sensor.akku_schutz_autoladen
+          state: 'on'
+      then:
+      - if:
+        - condition: and
+          conditions:
+          - condition: state
+            entity_id: sensor.battery_forced_charge_discharge_cmd
+            state: Forced charge
+          - condition: state
+            entity_id: sensor.ems_mode_selection
+            state: Forced mode
+        then:
+        - action: script.sungrow_akku_modus
+          data:
+            wr: WR1
+            modus: halten
+      - if:
+        - condition: and
+          conditions:
+          - condition: state
+            entity_id: sensor.wr2_battery_forced_charge_discharge_cmd
+            state: Forced charge
+          - condition: state
+            entity_id: sensor.wr2_ems_mode_selection
+            state: Forced mode
+        then:
+        - action: script.sungrow_akku_modus
+          data:
+            wr: WR2
+            modus: halten
+      else:
+      - action: script.sungrow_akku_modus
+        data:
+          wr: WR1
+          modus: normal
+    note: 'Gemeinsamer EMS-Modus: beide halten oder beide normal (Normalbetrieb setzt
+      das Skript fuer beide WR)'
+  mode: single
+- id: sungrow_akku_halten_beenden
+  alias: 'Sungrow: Akku halten beenden'
+  description: 'Beendet ''Akku halten'': (1) wenn binary_sensor.akku_schutz_autoladen
+    ausgeht - kein Auto lädt mehr, die PV deckt das Auto um 1 kW oder die restliche
+    PV-Prognose bringt den Akku wieder aufs Ziel; (2) 10 Minuten nachdem kein Auto
+    mehr lädt; (3) manuelles Halten ohne ladendes Auto nach 15 Minuten. Ein manuelles
+    Halten während ein Auto lädt bleibt bis zum Ladeende. Erkannt werden die
+    Wallbox und zwei Autos am go-e (über die Fahrzeug-API); das dritte Auto am go-e
+    ist nicht erkennbar. Ein vom Ladeplan gesetztes Halten (input_boolean.akku_halten_durch_plan)
+    bleibt unberührt; gibt der Plan es ab, und alle 10 min als Sicherheitsnetz, wird
+    erneut geprüft.'
+  triggers:
+  - trigger: state
+    entity_id: binary_sensor.akku_schutz_autoladen
+    from: 'on'
+    to: 'off'
+    id: schutz_aus
+  - trigger: numeric_state
+    entity_id: sensor.autoladeleistung
+    below: 200
+    for:
+      minutes: 10
+    id: kein_auto
+  - trigger: state
+    entity_id:
+    - sensor.ems_mode_selection
+    - sensor.wr2_ems_mode_selection
+    to: Forced mode
+    for:
+      minutes: 15
+    id: kein_auto
+  - trigger: state
+    entity_id: input_boolean.akku_halten_durch_plan
+    to: 'off'
+    for:
+      minutes: 1
+    id: kein_auto
+    note: 'Plan gibt sein Halten ab: pruefen, ob noch ein Grund zum Halten besteht'
+  - trigger: time_pattern
+    minutes: /10
+    id: kein_auto
+    note: 'Sicherheitsnetz: ein Halten ohne Grund darf nicht haengen bleiben (25./26.10.2026:
+      21 h Halten, 16,5 kWh PV ins Netz)'
+  conditions:
+  - condition: or
+    conditions:
+    - condition: state
+      entity_id: sensor.wr1_akku_modus
+      state: Akku halten
+    - condition: state
+      entity_id: sensor.wr2_akku_modus
+      state: Akku halten
+  - condition: not
+    conditions:
+    - condition: state
+      entity_id: binary_sensor.akku_schutz_autoladen
+      state: 'on'
+  - condition: or
+    conditions:
+    - condition: trigger
+      id: schutz_aus
+    - condition: and
+      conditions:
+      - condition: numeric_state
+        entity_id: sensor.autoladeleistung
+        below: 200
+      - condition: state
+        entity_id: sensor.ems_mode_selection
+        state: Forced mode
+        for:
+          minutes: 15
+    note: Kein Auto laedt und das Halten laeuft schon 15 min (ein frisch gesetztes
+      manuelles Halten bleibt so mindestens 15 min)
+  - condition: state
+    entity_id: input_boolean.akku_halten_durch_plan
+    state: 'off'
+    note: Ein vom Ladeplan gesetztes Halten gibt der Plan selbst wieder frei
+  actions:
+  - if:
+    - condition: state
+      entity_id: sensor.wr1_akku_modus
+      state: Akku halten
+    then:
+    - action: script.sungrow_akku_modus
+      data:
+        wr: WR1
+        modus: normal
+      continue_on_error: true
+  - if:
+    - condition: state
+      entity_id: sensor.wr2_akku_modus
+      state: Akku halten
+    then:
+    - action: script.sungrow_akku_modus
+      data:
+        wr: WR2
+        modus: normal
+      continue_on_error: true
+  - action: persistent_notification.create
+    data:
+      title: Akku halten beendet
+      message: '{{ ''Akku-Schutz nicht mehr nötig (PV reicht für das Auto oder lädt
+        den Akku heute wieder auf)'' if trigger.id == ''schutz_aus'' else ''Kein Auto
+        lädt mehr'' }} - Hausakkus zurück im Normalbetrieb.'
+      notification_id: sungrow_akku_halten_beendet
+  mode: single
+- id: sungrow_backup_reserve_wr1_setzen
+  alias: 'Sungrow: Backup-Reserve WR1 setzen'
+  description: Schreibt den Wert des Reglers 'Backup-Reserve WR1' in Register 13100
+    von WR1 (nur WR1 hat Backup-Verbraucher). Wartet 5 s, falls der Regler noch bewegt
+    wird, und prüft danach die Übernahme. Wird der Wert nicht übernommen, springt
+    der Regler auf den Wert des Wechselrichters zurück.
+  triggers:
+  - trigger: state
+    entity_id: input_number.backup_reserve_wr1
+    not_from:
+    - unknown
+    - unavailable
+    not_to:
+    - unknown
+    - unavailable
+  conditions:
+  - condition: template
+    value_template: '{{ states(''input_number.backup_reserve_wr1'') | int(-1) != states(''sensor.reserved_soc_for_backup'')
+      | int(-1) }}'
+  actions:
+  - delay:
+      seconds: 5
+  - variables:
+      ziel: '{{ states(''input_number.backup_reserve_wr1'') | int }}'
+  - action: modbus.write_register
+    data:
+      hub: WR1 SungrowSHx
+      slave: 1
+      address: 13099
+      value: '{{ ziel }}'
+  - delay:
+      seconds: 45
+  - if:
+    - condition: template
+      value_template: '{{ states(''sensor.reserved_soc_for_backup'') | int(-1) !=
+        ziel }}'
+    then:
+    - action: persistent_notification.create
+      data:
+        title: Backup-Reserve WR1 nicht übernommen
+        message: Gewünscht {{ ziel }} %, der Wechselrichter meldet {{ states('sensor.reserved_soc_for_backup')
+          }} %. Der Regler wurde zurückgesetzt.
+        notification_id: sungrow_backup_reserve_wr1
+    - action: input_number.set_value
+      target:
+        entity_id: input_number.backup_reserve_wr1
+      data:
+        value: '{{ states(''sensor.reserved_soc_for_backup'') | int(0) }}'
+  mode: restart
+- id: sungrow_backup_reserve_wr1_uebernehmen
+  alias: 'Sungrow: Backup-Reserve WR1 übernehmen'
+  description: Zieht den Regler 'Backup-Reserve WR1' nach, wenn die Reserve am Wechselrichter
+    geändert wurde (z. B. in der Sungrow-App) oder nach einem Neustart. Läuft nicht,
+    während gerade ein neuer Wert geschrieben wird.
+  triggers:
+  - trigger: state
+    entity_id: sensor.reserved_soc_for_backup
+    not_to:
+    - unknown
+    - unavailable
+  conditions:
+  - condition: state
+    entity_id: automation.sungrow_backup_reserve_wr1_setzen
+    attribute: current
+    state: 0
+  - condition: template
+    value_template: '{{ states(''input_number.backup_reserve_wr1'') | int(-1) != states(''sensor.reserved_soc_for_backup'')
+      | int(-1) }}'
+  actions:
+  - action: input_number.set_value
+    target:
+      entity_id: input_number.backup_reserve_wr1
+    data:
+      value: '{{ states(''sensor.reserved_soc_for_backup'') | int }}'
+  mode: single

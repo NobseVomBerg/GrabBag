@@ -1,0 +1,37 @@
+# PV-Überschuss: Steckdose (Prio 2) bei Überschuss an, bei wenig Überschuss wieder aus (Package)
+# Aus https://github.com/NobseVomBerg/GrabBag - MIT-Lizenz, ohne Gewähr. Entity-IDs an die eigene Anlage anpassen.
+# Braucht sensor.sum_total_dc_power und sensor.house_without_wallbox_power aus
+# ../zwei-wechselrichter/templates_solarsystem_summary.yaml - oder eigene PV- und Verbrauchssensoren.
+
+automation:
+  - id: "automation_solar_surplus_prio2_on"
+    alias: Solar Surplus Switch Prio 2 on
+    description: PV-Steckdose Prio 2 an, wenn die PV (DC) 5 min lang mehr als 2,5 kW über dem Hausverbrauch liegt
+    triggers:
+      - trigger: template
+        value_template: >-
+          {{ has_value('sensor.sum_total_dc_power') and has_value('sensor.house_without_wallbox_power')
+             and states('sensor.sum_total_dc_power') | int(0) - states('sensor.house_without_wallbox_power') | int(0) > 2500 }}
+        for:
+          minutes: 5
+    actions:
+      - action: switch.turn_on
+        target:
+          entity_id: switch.pv_steckdose_prio2
+    mode: single
+
+  - id: "automation_solar_surplus_prio2_off"
+    alias: Solar Surplus Switch Prio 2 off
+    description: PV-Steckdose Prio 2 aus, wenn der Überschuss 5 min lang unter 200 W liegt
+    triggers:
+      - trigger: template
+        value_template: >-
+          {{ has_value('sensor.sum_total_dc_power') and has_value('sensor.house_without_wallbox_power')
+             and states('sensor.sum_total_dc_power') | int(0) - states('sensor.house_without_wallbox_power') | int(0) < 200 }}
+        for:
+          minutes: 5
+    actions:
+      - action: switch.turn_off
+        target:
+          entity_id: switch.pv_steckdose_prio2
+    mode: single

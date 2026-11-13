@@ -1,0 +1,106 @@
+# Recorder: Datenbank klein halten
+# Aus https://github.com/NobseVomBerg/GrabBag - MIT-Lizenz, ohne Gewähr. Entity-IDs an die eigene Anlage anpassen.
+#
+# Automationen:
+#   - Purge Database: tägliches Aufräumen ohne Repack (VACUUM braucht so viel freien Platz wie die DB groß ist)
+#   - Purge noisy sensors / Device Trackers / Zusammenfassungen: schnell wechselnde oder abgeleitete
+#     Sensoren nur wenige Tage behalten
+#
+# Braucht:
+#   - nur den Recorder; Entity-Listen an die eigenen Sensoren anpassen
+#
+# Einbinden: in der UI je Automation neu anlegen, "In YAML bearbeiten" und den Block einfügen
+# (bleibt in der UI editierbar). Oder die ganze Datei in configuration.yaml einbinden:
+#   automation recorder: !include automations_recorder.yaml
+# (dann in der UI nur lesbar).
+
+- id: '1713914589990'
+  alias: Purge Database
+  description: 'Cleanup ohne Repack: das Komprimieren (VACUUM) braucht so viel freien
+    Platz wie die Datenbank gross ist (7,5 GB) und hat den Datentraeger am 10./11.10.2026
+    volllaufen lassen. Erst nach Vergroesserung der VM-Platte wieder einschalten.'
+  triggers:
+  - at: 02:30:00
+    trigger: time
+  conditions: []
+  actions:
+  - data:
+      keep_days: 180
+      repack: false
+      apply_filter: true
+    action: recorder.purge
+  mode: single
+  initial_state: true
+- id: '1713916063995'
+  alias: Purge noisy sensors, keep 5 Days
+  description: ''
+  trigger:
+  - platform: time
+    at: 02:00:00
+  condition: []
+  action:
+  - service: recorder.purge_entities
+    data:
+      keep_days: 5
+      entity_globs:
+      - sensor.mppt*
+      - sensor.phase_*_power
+      - sensor.phase_*_current
+      - sensor.phase_*_voltage
+      - sensor.wr2_phase_*_power
+      - sensor.wr2_phase_*_current
+      - sensor.wr2_phase_*_voltage
+      - sensor.*meter_phase*
+      - sensor.backup_phase_*_power
+      - sensor.wr2_backup_phase_*_power
+      - sensor.*power_factor
+      - sensor.*reactive_power
+      - sensor.*running_state
+    target:
+      entity_id:
+      - sensor.inverter_loss
+      - sensor.real_load
+      - sensor.solar_to_house
+      - sensor.solar_to_battery
+      - sensor.solar_to_grid
+      - sensor.meter_active_power_raw
+      - sensor.meter_active_power
+      - sensor.meter_phase_a_active_power_raw
+      - sensor.meter_phase_a_active_power
+      - sensor.meter_phase_b_active_power_raw
+      - sensor.meter_phase_b_active_power
+      - sensor.meter_phase_c_active_power_raw
+      - sensor.meter_phase_c_active_power
+- id: '1713922011800'
+  alias: Purge Device Trackers
+  description: ''
+  trigger:
+  - platform: time
+    at: 01:50:00
+  condition: []
+  action:
+  - service: recorder.purge_entities
+    data:
+      keep_days: 14
+      domains:
+      - device_tracker
+  mode: single
+- id: '1793051108473'
+  alias: Purge Zusammenfassungen, keep 14 Days
+  description: Etagen-Zusammenfassungen (Gruppen-Helfer) sind nur abgeleitete Werte,
+    die Einzelsensoren behalten ihren vollen Verlauf.
+  triggers:
+  - trigger: time
+    at: 01:55:00
+  conditions: []
+  actions:
+  - action: recorder.purge_entities
+    data:
+      keep_days: 14
+    target:
+      entity_id:
+      - binary_sensor.fenster_turen_ug
+      - binary_sensor.bewegung_ug
+      - binary_sensor.bewegung_eg
+      - binary_sensor.bewegung_og
+  mode: single

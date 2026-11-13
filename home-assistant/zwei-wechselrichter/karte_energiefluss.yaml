@@ -1,0 +1,18 @@
+# Dashboard-Karte Energiefluss (HACS: tesla-style-solar-power-card) - in der UI: Karte hinzufügen -> Manuell.
+# Aus https://github.com/NobseVomBerg/GrabBag - MIT-Lizenz, ohne Gewähr.
+# Flüsse aus templates_energiefluss.yaml, Akku-/Temperatur-Mittel aus templates_solarsystem_summary.yaml.
+
+type: custom:tesla-style-solar-power-card
+grid_to_house_entity: sensor.grid_to_house
+grid_to_battery_entity: sensor.grid_to_battery
+generation_to_grid_entity: sensor.solar_to_grid
+generation_to_battery_entity: sensor.solar_to_battery
+generation_to_house_entity: sensor.solar_to_house
+battery_to_house_entity: sensor.battery_to_house
+battery_to_grid_entity: sensor.battery_to_grid
+battery_extra_entity: sensor.average_battery_level
+house_extra_entity: sensor.average_inverter_temperature
+appliance1_consumption_entity: sensor.wallbox_load_power
+appliance1_extra_entity: sensor.wallbox_status
+speed_factor: 0.03
+threshold_in_k: 1

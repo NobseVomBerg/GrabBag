@@ -1,0 +1,152 @@
+# Dashboard-Karte "Akku-Steuerung": Grenzwerte, Zustand je WR, Tasten für die drei Modi - Karte hinzufügen -> Manuell.
+# Aus https://github.com/NobseVomBerg/GrabBag - MIT-Lizenz, ohne Gewähr.
+# Die Tasten rufen script.sungrow_akku_modus; card_mod (HACS) hebt die aktive Taste hervor.
+
+type: vertical-stack
+cards:
+- type: entities
+  title: Akku-Steuerung
+  show_header_toggle: false
+  entities:
+  - entity: input_number.zwangsladen_leistung
+    name: Ladeleistung je Akku
+  - entity: input_number.zwangsladen_ziel_soc
+    name: Laden bis SoC
+  - entity: input_number.ladebudget_gesamt
+    name: Budget Netzbezug gesamt
+  - entity: input_number.netz_phasengrenze
+    name: Grenze je Phase
+  - entity: sensor.netz_max_phasenstrom
+    name: Stärkste Phase jetzt
+- type: entities
+  title: WR1
+  show_header_toggle: false
+  entities:
+  - entity: sensor.battery_level
+    name: Ladestand
+  - entity: sensor.ems_mode_selection
+    name: EMS-Modus
+  - entity: sensor.battery_forced_charge_discharge_cmd
+    name: Befehl
+  - entity: sensor.battery_forced_charge_discharge_power
+    name: Zwangsladeleistung
+- type: grid
+  columns: 3
+  square: false
+  cards:
+  - type: button
+    name: Zwangsladen
+    icon: mdi:battery-charging-high
+    show_state: false
+    tap_action:
+      action: perform-action
+      perform_action: script.sungrow_akku_modus
+      data:
+        wr: WR1
+        modus: laden
+      confirmation:
+        text: WR1 mit der eingestellten Leistung aus dem Netz laden?
+    hold_action:
+      action: none
+    card_mod:
+      style: "ha-card {\n  {% if is_state('sensor.wr1_akku_modus', 'Zwangsladen') %}\n  background-color: rgba(255, 193, 7,\
+        \ 0.22);\n  border: 1px solid rgb(255, 193, 7);\n  color: rgb(255, 193, 7);\n  --card-mod-icon-color: rgb(255, 193,\
+        \ 7);\n  --state-icon-color: rgb(255, 193, 7);\n  {% endif %}\n}\n"
+  - type: button
+    name: Akku halten
+    icon: mdi:battery-lock
+    show_state: false
+    tap_action:
+      action: perform-action
+      perform_action: script.sungrow_akku_modus
+      data:
+        wr: WR1
+        modus: halten
+    hold_action:
+      action: none
+    card_mod:
+      style: "ha-card {\n  {% if is_state('sensor.wr1_akku_modus', 'Akku halten') %}\n  background-color: rgba(255, 193, 7,\
+        \ 0.22);\n  border: 1px solid rgb(255, 193, 7);\n  color: rgb(255, 193, 7);\n  --card-mod-icon-color: rgb(255, 193,\
+        \ 7);\n  --state-icon-color: rgb(255, 193, 7);\n  {% endif %}\n}\n"
+  - type: button
+    name: Normalbetrieb
+    icon: mdi:battery-sync
+    show_state: false
+    tap_action:
+      action: perform-action
+      perform_action: script.sungrow_akku_modus
+      data:
+        wr: WR1
+        modus: normal
+    hold_action:
+      action: none
+    card_mod:
+      style: "ha-card {\n  {% if is_state('sensor.wr1_akku_modus', 'Normalbetrieb') %}\n  background-color: rgba(255, 193,\
+        \ 7, 0.22);\n  border: 1px solid rgb(255, 193, 7);\n  color: rgb(255, 193, 7);\n  --card-mod-icon-color: rgb(255,\
+        \ 193, 7);\n  --state-icon-color: rgb(255, 193, 7);\n  {% endif %}\n}\n"
+- type: entities
+  title: WR2
+  show_header_toggle: false
+  entities:
+  - entity: sensor.wr2_battery_level
+    name: Ladestand
+  - entity: sensor.wr2_ems_mode_selection
+    name: EMS-Modus
+  - entity: sensor.wr2_battery_forced_charge_discharge_cmd
+    name: Befehl
+  - entity: sensor.wr2_battery_forced_charge_discharge_power
+    name: Zwangsladeleistung
+- type: grid
+  columns: 3
+  square: false
+  cards:
+  - type: button
+    name: Zwangsladen
+    icon: mdi:battery-charging-high
+    show_state: false
+    tap_action:
+      action: perform-action
+      perform_action: script.sungrow_akku_modus
+      data:
+        wr: WR2
+        modus: laden
+      confirmation:
+        text: WR2 mit der eingestellten Leistung aus dem Netz laden?
+    hold_action:
+      action: none
+    card_mod:
+      style: "ha-card {\n  {% if is_state('sensor.wr2_akku_modus', 'Zwangsladen') %}\n  background-color: rgba(255, 193, 7,\
+        \ 0.22);\n  border: 1px solid rgb(255, 193, 7);\n  color: rgb(255, 193, 7);\n  --card-mod-icon-color: rgb(255, 193,\
+        \ 7);\n  --state-icon-color: rgb(255, 193, 7);\n  {% endif %}\n}\n"
+  - type: button
+    name: Akku halten
+    icon: mdi:battery-lock
+    show_state: false
+    tap_action:
+      action: perform-action
+      perform_action: script.sungrow_akku_modus
+      data:
+        wr: WR2
+        modus: halten
+    hold_action:
+      action: none
+    card_mod:
+      style: "ha-card {\n  {% if is_state('sensor.wr2_akku_modus', 'Akku halten') %}\n  background-color: rgba(255, 193, 7,\
+        \ 0.22);\n  border: 1px solid rgb(255, 193, 7);\n  color: rgb(255, 193, 7);\n  --card-mod-icon-color: rgb(255, 193,\
+        \ 7);\n  --state-icon-color: rgb(255, 193, 7);\n  {% endif %}\n}\n"
+  - type: button
+    name: Normalbetrieb
+    icon: mdi:battery-sync
+    show_state: false
+    tap_action:
+      action: perform-action
+      perform_action: script.sungrow_akku_modus
+      data:
+        wr: WR2
+        modus: normal
+    hold_action:
+      action: none
+    card_mod:
+      style: "ha-card {\n  {% if is_state('sensor.wr2_akku_modus', 'Normalbetrieb') %}\n  background-color: rgba(255, 193,\
+        \ 7, 0.22);\n  border: 1px solid rgb(255, 193, 7);\n  color: rgb(255, 193, 7);\n  --card-mod-icon-color: rgb(255,\
+        \ 193, 7);\n  --state-icon-color: rgb(255, 193, 7);\n  {% endif %}\n}\n"

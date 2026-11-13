@@ -1,0 +1,66 @@
+# Dashboard-Karte "Strompreis effektiv" - in der UI: Karte hinzufügen -> Manuell, diesen Inhalt einfügen.
+# Aus https://github.com/NobseVomBerg/GrabBag - MIT-Lizenz, ohne Gewähr.
+# Braucht helfer_strompreis_effektiv.yaml. Die Schwelle 0,343 €/kWh ist mein Vergleich mit einem Festpreis-
+# angebot (32,8 ct + Grundpreis-Unterschied): eigenen Wert in Untertitel und Tacho-Segment eintragen.
+# sensor.DEIN_ZUHAUSE_electricity_price heißt bei dir anders: der Preissensor der Tibber-Integration.
+
+type: vertical-stack
+cards:
+- type: heading
+  heading: Strompreis effektiv
+  heading_style: title
+  icon: mdi:cash-clock
+- type: heading
+  heading: Bezugskosten ÷ kWh ohne Grundpreis. Unter 0,343 €/kWh im Jahresschnitt bleibt Tibber günstiger als das Festpreis-Angebot.
+  heading_style: subtitle
+- type: gauge
+  entity: sensor.strompreis_effektiv_stromjahr
+  name: Ø seit 01.11.2026
+  min: 0.2
+  max: 0.6
+  needle: true
+  segments:
+  - from: 0
+    color: '#43a047'
+    label: Tibber günstiger
+  - from: 0.343
+    color: '#db4437'
+    label: Festpreis günstiger
+- type: entities
+  entities:
+  - entity: sensor.strompreis_effektiv_monat
+    name: Effektiv diesen Monat
+  - type: conditional
+    conditions:
+    - entity: sensor.strompreis_effektiv_vormonat
+      state_not: unavailable
+    row:
+      entity: sensor.strompreis_effektiv_vormonat
+      name: Effektiv Vormonat
+  - entity: sensor.netzbezug_monat
+    name: Netzbezug diesen Monat
+  - entity: sensor.stromkosten_monat
+    name: Stromkosten diesen Monat
+  - entity: sensor.netzbezug_stromjahr
+    name: Netzbezug seit 01.11.
+  - entity: sensor.stromkosten_stromjahr
+    name: Stromkosten seit 01.11.
+- type: statistic
+  entity: sensor.DEIN_ZUHAUSE_electricity_price
+  name: Tibber-Durchschnitt diesen Monat
+  period:
+    calendar:
+      period: month
+  stat_type: mean
+- type: statistics-graph
+  title: Netzbezug und Kosten pro Monat
+  entities:
+  - entity: sensor.total_imported_energy
+    name: Netzbezug
+  - entity: sensor.sum_daily_imported_energy_cost
+    name: Kosten
+  period: month
+  stat_types:
+  - change
+  chart_type: bar
+  days_to_show: 365

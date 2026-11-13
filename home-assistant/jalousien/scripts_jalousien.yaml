@@ -1,0 +1,102 @@
+# Jalousien: sicher fahren trotz wackeliger WLAN-Verbindung
+# Aus https://github.com/NobseVomBerg/GrabBag - MIT-Lizenz, ohne Gewähr. Entity-IDs an die eigene Anlage anpassen.
+#
+# Skripte:
+#   - jalousie_sicher_fahren: wiederholt den Befehl bis zu 6-mal, bis die Jalousie sich bewegt
+#   - jalousie_befehl: ein einzelner Befehl (läuft per script.turn_on, damit ein Fehler nur ihn abbricht)
+#
+# Einbinden: in der UI je Skript neu anlegen, "In YAML bearbeiten" und den Inhalt unter dem Schlüssel
+# einfügen (die Skript-ID muss gleich bleiben, die Automationen rufen sie auf). Oder in configuration.yaml:
+#   script jalousien: !include scripts_jalousien.yaml
+
+jalousie_sicher_fahren:
+  alias: 'Jalousie: sicher fahren (mit Wiederholung)'
+  description: 'Fährt eine Jalousie auf oder zu und wiederholt den Befehl bis zu 6-mal
+    im Abstand von 8 s, bis sie sich in die gewünschte Richtung bewegt oder dort steht.
+    Hintergrund: Die Shellys verlieren mehrmals pro Stunde kurz die Verbindung, ein
+    Befehl genau dann scheitert mit ''Not connected''. Wartet vor jedem Versuch bis
+    zu 2 min, falls der Shelly gerade nicht verfügbar ist.'
+  fields:
+    jalousie:
+      name: Jalousie
+      required: true
+      selector:
+        entity:
+          domain: cover
+    richtung:
+      name: Richtung
+      required: true
+      selector:
+        select:
+          options:
+          - auf
+          - zu
+  sequence:
+  - variables:
+      ziel: '{{ [''closing'', ''closed''] if richtung == ''zu'' else [''opening'',
+        ''open''] }}'
+  - repeat:
+      sequence:
+      - wait_template: '{{ has_value(jalousie) }}'
+        timeout: 00:02:00
+      - action: script.turn_on
+        target:
+          entity_id: script.jalousie_befehl
+        data:
+          variables:
+            jalousie: '{{ jalousie }}'
+            richtung: '{{ richtung }}'
+        note: 'Getrennter Lauf: ein Fehler dort bricht diese Schleife nicht ab'
+      - delay:
+          seconds: 8
+      until:
+      - condition: template
+        value_template: '{{ states(jalousie) in ziel or repeat.index >= 6 }}'
+  - if:
+    - condition: template
+      value_template: '{{ states(jalousie) not in ziel }}'
+    then:
+    - action: system_log.write
+      data:
+        level: warning
+        logger: jalousie_sicher_fahren
+        message: '{{ jalousie }} ließ sich nach 6 Versuchen nicht {{ ''schließen''
+          if richtung == ''zu'' else ''öffnen'' }} (Zustand: {{ states(jalousie) }})'
+  mode: parallel
+  max: 10
+  icon: mdi:window-shutter-cog
+jalousie_befehl:
+  alias: 'Jalousie: Einzelbefehl'
+  description: Ein einzelner Auf-/Zu-Befehl an eine Jalousie. Wird von script.jalousie_sicher_fahren
+    per script.turn_on gestartet, damit ein Verbindungsfehler des Shelly nur diesen
+    Lauf abbricht.
+  fields:
+    jalousie:
+      name: Jalousie
+      required: true
+      selector:
+        entity:
+          domain: cover
+    richtung:
+      name: Richtung
+      required: true
+      selector:
+        select:
+          options:
+          - auf
+          - zu
+  sequence:
+  - if:
+    - condition: template
+      value_template: '{{ richtung == ''zu'' }}'
+    then:
+    - action: cover.close_cover
+      target:
+        entity_id: '{{ jalousie }}'
+    else:
+    - action: cover.open_cover
+      target:
+        entity_id: '{{ jalousie }}'
+  mode: parallel
+  max: 10
+  icon: mdi:window-shutter

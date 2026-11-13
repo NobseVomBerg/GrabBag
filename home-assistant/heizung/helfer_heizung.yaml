@@ -1,0 +1,24 @@
+# Heizung: Timer für "Soll nach 2 h zurück aufs Programm" (automations_heizung.yaml)
+# Aus https://github.com/NobseVomBerg/GrabBag - MIT-Lizenz, ohne Gewähr.
+#
+# Als Package einbinden (configuration.yaml: homeassistant: packages: !include_dir_named packages,
+# Datei nach packages/) oder in der UI als Timer mit denselben Namen anlegen.
+# restore: true - ein laufender Timer übersteht einen Neustart von Home Assistant.
+
+timer:
+  wohnzimmer_soll_zurucksetzen:
+    name: Wohnzimmer Soll zurücksetzen
+    duration: "02:00:00"
+    restore: true
+  schlafzimmer_soll_zurucksetzen:
+    name: Schlafzimmer Soll zurücksetzen
+    duration: "02:00:00"
+    restore: true
+  buro_1_soll_zurucksetzen:
+    name: Büro 1 Soll zurücksetzen
+    duration: "02:00:00"
+    restore: true
+  buro_2_soll_zurucksetzen:
+    name: Büro 2 Soll zurücksetzen
+    duration: "02:00:00"
+    restore: true

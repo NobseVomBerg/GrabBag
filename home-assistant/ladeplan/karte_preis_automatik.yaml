@@ -1,0 +1,56 @@
+# Dashboard-Karte "Preis-Automatik": Einstellungen + Begründung des Plans - Karte hinzufügen -> Manuell.
+# Aus https://github.com/NobseVomBerg/GrabBag - MIT-Lizenz, ohne Gewähr.
+# card_mod (HACS) verbindet die beiden Karten optisch; ohne card_mod die card_mod-Blöcke weglassen.
+
+type: vertical-stack
+card_mod:
+  style: ':host { --vertical-stack-card-gap: 0px; }
+
+    #root { gap: 0px !important; }
+
+    '
+cards:
+- type: entities
+  title: Preis-Automatik
+  show_header_toggle: false
+  entities:
+  - entity: input_boolean.preis_automatik
+    name: Preis-Automatik aktiv
+  - entity: sensor.netzladeplan
+    name: Netzladen (Plan)
+  - entity: binary_sensor.akku_schutz_autoladen
+    name: Hausakku hält beim Autoladen
+    icon: mdi:car-electric
+  - entity: input_number.akku_schutz_min_soc
+    name: Auto darf Hausakku nutzen bis
+  - entity: input_number.akku_schutz_ziel_aus_pv
+    name: … tiefer, wenn PV heute wieder lädt auf
+  - entity: input_number.max_ladepreis_netz
+    name: Max. Ladepreis Netz
+  - entity: input_number.mindestvorteil_netzladen
+    name: Mindestvorteil ggü. Tagpreis
+  card_mod:
+    style: "ha-card {\n  border-bottom: none;\n  border-bottom-left-radius: 0;\n  border-bottom-right-radius: 0;\n}\n"
+- type: markdown
+  content: '{% set p = ''sensor.netzladeplan'' %}{% set s = ''binary_sensor.akku_schutz_autoladen'' %}{{ state_attr(p, ''grund'')
+    or ''Noch nicht berechnet'' }}
+
+
+    <small>Akku {{ state_attr(p, ''akku_kwh'') | string | replace(''.'', '','') }} kWh · PV-Rest heute {{ state_attr(p, ''pv_rest_kwh'')
+    | string | replace(''.'', '','') }} kWh (Prognose × {{ states(''sensor.pv_prognose_faktor'') | replace(''.'', '','') }})
+    · Verbrauch Ø {{ state_attr(p, ''verbrauch_w'') }} W ({{ state_attr(p, ''verbrauch_quelle'') }})<br>{% set pa = state_attr(p,
+    ''pv_ab'') %}{% set pb = state_attr(p, ''pv_bis'') %}PV-Überschuss {{ (as_timestamp(pa, 0) | timestamp_custom(''%H:%M'')
+    ~ ''–'' ~ as_timestamp(pb, 0) | timestamp_custom(''%H:%M'') ~ '': '' ~ (state_attr(p, ''pv_ueberschuss_kwh'') | string
+    | replace(''.'', '','')) ~ '' kWh'' ~ ('', füllt den Akku'' if state_attr(p, ''pv_fuellt_akku'') else '', füllt den Akku
+    nicht'')) if pa else ''keiner im Plan'' }}{% set k = state_attr(p, ''pv_kappung'') | float(1) %}{{ ('' · PV-Prognose auf
+    '' ~ (k * 100) | round(0) | int ~ '' % gekappt (echte PV '' ~ (state_attr(p, ''pv_jetzt_kw'') | string | replace(''.'',
+    '','')) ~ '' kW)'') if k < 1 else '''' }}<br>{% set g = state_attr(p, ''guenstigste_zeit'') %}{% set hz = state_attr(p,
+    ''horizont_ende'') %}Günstigste Viertelstunde bis {{ as_timestamp(hz, 0) | timestamp_custom(''%d.%m. %H:%M'') if hz else
+    ''?'' }}: {{ as_timestamp(g, 0) | timestamp_custom(''%H:%M'') if g else ''–'' }} ({{ ''%.3f'' | format(state_attr(p, ''guenstigster_preis'')
+    | float(0)) | replace(''.'', '','') }} €) · Stand {{ as_timestamp(state_attr(p, ''berechnet''), 0) | timestamp_custom(''%H:%M'')
+    }}<br>Autoladen: PV-Überschuss heute noch {{ state_attr(s, ''pv_ueberschuss_heute_kwh'') | string | replace(''.'', '','')
+    }} kWh, bis {{ states(''input_number.akku_schutz_ziel_aus_pv'') | int(60) }} % fehlen {{ state_attr(s, ''bis_ziel_kwh'')
+    | string | replace(''.'', '','') }} kWh</small>'
+  card_mod:
+    style: "ha-card {\n  border-top: none;\n  border-top-left-radius: 0;\n  border-top-right-radius: 0;\n}\nha-markdown {\n\
+      \  padding-top: 0px !important;\n}\n"

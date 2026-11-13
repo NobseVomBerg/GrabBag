@@ -1,0 +1,39 @@
+{#
+  Power flow for two Sungrow SH10RT (WR1 with grid meter, WR2 without) - all values in W, >= 0.
+  Used by the flow sensors in integrations/templates.yaml (tesla-style-solar-power-card).
+
+  Inputs:  PV (DC, both WR), battery charge/discharge (both WR), grid import/export (WR1 meter),
+           house = sensor.sum_load_power (WR1 load + WR2 AC output).
+  Batteries are netted: one charging while the other discharges is an internal transfer.
+  Solar flows are capped at the available PV, because the registers are not read at the
+  same moment (10/20/60 s scan intervals) and would otherwise overshoot during load jumps.
+#}
+
+{% macro power_flow(flow) -%}
+{%- set pv = states('sensor.sum_total_dc_power') | float(0) -%}
+{%- set chg = states('sensor.sum_battery_charging_power') | float(0) -%}
+{%- set dis = states('sensor.sum_battery_discharging_power') | float(0) -%}
+{%- set imp = states('sensor.import_power') | float(0) -%}
+{%- set exp = states('sensor.export_power') | float(0) -%}
+{%- set house = [states('sensor.sum_load_power') | float(0), 0] | max -%}
+{%- set net_chg = [chg - dis, 0] | max -%}
+{%- set net_dis = [dis - chg, 0] | max -%}
+{%- set s2b = [net_chg, pv] | min -%}
+{%- set g2b = [[net_chg - pv, 0] | max, imp] | min -%}
+{%- set b2h = [net_dis, house] | min -%}
+{%- set b2g = [[net_dis - house, 0] | max, exp] | min -%}
+{%- set g2h = [imp - g2b, 0] | max -%}
+{%- set s2g = [exp - b2g, 0] | max -%}
+{%- set s2h = [[house - g2h - b2h, pv - s2b - s2g] | min, 0] | max -%}
+{%- set flows = {
+      'solar_to_battery': s2b, 'grid_to_battery': g2b,
+      'battery_to_house': b2h, 'battery_to_grid': b2g,
+      'grid_to_house': g2h, 'solar_to_house': s2h, 'solar_to_grid': s2g } -%}
+{{- flows[flow] | round(0) | int -}}
+{%- endmacro %}
+
+{% macro power_flow_available() -%}
+{{- has_value('sensor.sum_total_dc_power') and has_value('sensor.sum_battery_charging_power')
+    and has_value('sensor.sum_battery_discharging_power') and has_value('sensor.import_power')
+    and has_value('sensor.export_power') and has_value('sensor.sum_load_power') -}}
+{%- endmacro %}
