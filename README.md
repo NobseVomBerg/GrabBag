@@ -32,6 +32,12 @@ und lass sie das Setup anpassen. Wie genau, steht in der Setup-Datei.
 
 Mehr dazu in [home-assistant/README.md](home-assistant/README.md).
 
+## Änderungen
+
+Was sich wann an welcher Vorlage geändert hat, steht im [CHANGELOG.md](CHANGELOG.md).
+Größere Stände gibt es als [Releases](https://github.com/NobseVomBerg/GrabBag/releases): Wer das Repo auf GitHub mit
+„Watch → Custom → Releases" beobachtet, bekommt dazu eine Benachrichtigung.
+
 ## Lizenz
 
 [MIT](LICENSE): Kopieren, ändern, weitergeben — alles erlaubt, solange
