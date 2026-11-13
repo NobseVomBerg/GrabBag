@@ -1,0 +1,148 @@
+# Dashboard-Ansicht "SENEC": Live-Werte, Akku-Module und Energie pro Tag (Abschnitte-Ansicht)
+# Aus https://github.com/NobseVomBerg/GrabBag - MIT-Lizenz, ohne Gewähr.
+# Einfügen: Dashboard bearbeiten -> drei Punkte -> Raw-Konfigurationseditor, unter 'views:' als weiteren Eintrag.
+# Die sensor.senec_*-Leistungen kommen von der Integration marq24/ha-senec-v3 (HACS), die Energiezähler
+# (senec_pv_erzeugt usw.) aus helfer_senec.yaml. Im Hinweis ganz unten das Datum eintragen, ab dem die Helfer zählen.
+
+- title: SENEC
+  path: senec
+  icon: mdi:home-battery
+  type: sections
+  max_columns: 2
+  sections:
+  - type: grid
+    cards:
+    - type: heading
+      heading: SENEC Solarakku
+      icon: mdi:home-battery
+      heading_style: title
+    - type: tile
+      entity: sensor.senec_battery_charge_percent
+      name: Akku
+      grid_options:
+        columns: 6
+      icon: mdi:battery
+    - type: tile
+      entity: sensor.senec_system_state
+      name: Status
+      grid_options:
+        columns: 6
+      icon: mdi:information-outline
+    - type: tile
+      entity: sensor.senec_solar_generated_power
+      name: PV
+      grid_options:
+        columns: 6
+      icon: mdi:solar-power
+    - type: tile
+      entity: sensor.senec_house_power
+      name: Haus
+      grid_options:
+        columns: 6
+      icon: mdi:home-lightning-bolt
+    - type: tile
+      entity: sensor.senec_battery_charge_power
+      name: Akku laden
+      grid_options:
+        columns: 6
+      icon: mdi:battery-arrow-up
+    - type: tile
+      entity: sensor.senec_battery_discharge_power
+      name: Akku entladen
+      grid_options:
+        columns: 6
+      icon: mdi:battery-arrow-down
+    - type: tile
+      entity: sensor.senec_grid_imported_power
+      name: Netzbezug
+      grid_options:
+        columns: 6
+      icon: mdi:transmission-tower-import
+    - type: tile
+      entity: sensor.senec_grid_exported_power
+      name: Einspeisung
+      grid_options:
+        columns: 6
+      icon: mdi:transmission-tower-export
+  - type: grid
+    cards:
+    - type: heading
+      heading: Akku-Details
+      icon: mdi:battery-heart-variant
+      heading_style: title
+    - type: tile
+      entity: sensor.senec_bms_soc_a
+      name: Modul A
+      grid_options:
+        columns: 6
+      icon: mdi:battery-medium
+    - type: tile
+      entity: sensor.senec_bms_soc_b
+      name: Modul B
+      grid_options:
+        columns: 6
+      icon: mdi:battery-medium
+    - type: tile
+      entity: sensor.senec_bms_soc_c
+      name: Modul C
+      grid_options:
+        columns: 6
+      icon: mdi:battery-medium
+    - type: tile
+      entity: sensor.senec_battery_temp
+      name: Akku-Temperatur
+      grid_options:
+        columns: 6
+      icon: mdi:thermometer
+    - type: tile
+      entity: sensor.senec_case_temp
+      name: Gehäuse
+      grid_options:
+        columns: 6
+      icon: mdi:thermometer
+    - type: tile
+      entity: sensor.senec_mcu_temp
+      name: Steuerung
+      grid_options:
+        columns: 6
+      icon: mdi:thermometer
+    - type: tile
+      entity: switch.senec_safe_charge
+      name: Akku zwangsladen
+      grid_options:
+        columns: 12
+      icon: mdi:battery-charging-high
+  - type: grid
+    column_span: 2
+    cards:
+    - type: heading
+      heading: Energie pro Tag
+      icon: mdi:chart-bar
+      heading_style: title
+    - type: statistics-graph
+      chart_type: bar
+      period: day
+      stat_types:
+      - change
+      days_to_show: 14
+      entities:
+      - entity: sensor.senec_pv_erzeugt
+        name: PV
+      - entity: sensor.senec_hausverbrauch
+        name: Haus
+      - entity: sensor.senec_netzbezug
+        name: Netzbezug
+      - entity: sensor.senec_einspeisung
+        name: Einspeisung
+      - entity: sensor.senec_akku_geladen
+        name: Akku geladen
+      - entity: sensor.senec_akku_entladen
+        name: Akku entladen
+      grid_options:
+        columns: full
+        rows: 5
+    - type: markdown
+      content: <small>Selbst aufsummiert aus den Leistungswerten des SENEC (seit 11.10.2026), kann von den SENEC-eigenen Zählern
+        um einige Prozent abweichen.</small>
+      grid_options:
+        columns: full

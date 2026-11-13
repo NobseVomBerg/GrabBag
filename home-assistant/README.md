@@ -13,6 +13,7 @@ und die Grenzwerte an die eigene Anlage anpassen.
 | [sungrow-steuerung/](sungrow-steuerung/) | Hausakkus per Modbus schalten (Normalbetrieb, Akku halten, Zwangsladen aus dem Netz) mit Leistungsregelung unter Netzbudget und Phasengrenze, Notbremsen, Neustart-Schutz, Backup-Reserve. Dazu die Automationen der Preis-Automatik (Tibber). |
 | [ladeplan/](ladeplan/) | Der Plan dahinter: je Viertelstunde laden, halten oder freigeben nach Tibber-Preisen, PV-Prognose und Verbrauch. Dazu Tibber-Preisvorschau, Akku-Schutz beim Autoladen und die Karte „Strompreis effektiv". |
 | [pv-ueberschuss/](pv-ueberschuss/) | Steckdose bei PV-Überschuss zuschalten, mit Hysterese gegen Flattern. |
+| [senec-auswertung/](senec-auswertung/) | Dashboard-Ansicht für einen SENEC.Home-Speicher (Integration marq24/ha-senec-v3): Live-Werte, Ladestand je Akku-Modul und Energie pro Tag aus selbst aufsummierten Zählern. |
 | [heizung/](heizung/) | Heizkörperthermostate folgen einem Raumthermostat (Homematic / Homematic IP), Fenster offen → aus, manuelles Verstellen gilt 2 Stunden (Lüften zählt nicht mit). |
 | [jalousien/](jalousien/) | Jalousien nach Sonnenstand (Shelly 2PM Gen3), mit Wiederholung bei Verbindungsabbrüchen. |
 | [recorder/](recorder/) | Datenbank klein halten: Aufräumen ohne Repack, laute Sensoren nur wenige Tage behalten. |

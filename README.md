@@ -24,6 +24,7 @@ und lass sie das Setup anpassen. Wie genau, steht in der Setup-Datei.
 | [sungrow-steuerung/](home-assistant/sungrow-steuerung/) | Hausakkus schalten und absichern: Zwangsladen mit Leistungsregelung, Akku halten, Notbremsen, Preis-Automatik |
 | [ladeplan/](home-assistant/ladeplan/) | Hausakkus nach Tibber-Preis und PV-Prognose laden und halten, effektiven Strompreis verfolgen |
 | [pv-ueberschuss/](home-assistant/pv-ueberschuss/) | Steckdose bei PV-Überschuss zuschalten |
+| [senec-auswertung/](home-assistant/senec-auswertung/) | SENEC-Speicher: Live-Werte, Akku-Module und Energie pro Tag aus selbst aufsummierten Zählern |
 | [heizung/](home-assistant/heizung/) | Heizkörper folgen dem Raumthermostat, Fenster offen → aus |
 | [jalousien/](home-assistant/jalousien/) | Jalousien nach Sonnenstand, robust gegen WLAN-Aussetzer |
 | [recorder/](home-assistant/recorder/) | Datenbank klein halten |

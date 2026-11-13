@@ -1,0 +1,74 @@
+# SENEC: Energiezähler aus den Leistungswerten selbst aufsummieren (Riemann-Summe, Package)
+# Aus https://github.com/NobseVomBerg/GrabBag - MIT-Lizenz, ohne Gewähr. Entity-IDs an die eigene Anlage anpassen.
+#
+# Die Integration marq24/ha-senec-v3 (HACS) liefert Leistungen in W. Diese Helfer machen daraus kWh-Zähler mit
+# Langzeitstatistik, aus denen ansicht_senec.yaml die Tagesbalken zeichnet. Sie zählen erst ab dem Anlegen und
+# können von den SENEC-eigenen Zählern um einige Prozent abweichen.
+# Lässt sich auch als UI-Helfer anlegen: Einstellungen -> Helfer -> Integral (Riemann-Summe), Methode "Links",
+# metrischer Präfix k, Zeiteinheit Stunden, 2 Nachkommastellen.
+#
+# method: left passt zu sprunghaften Leistungswerten (Zustand gilt bis zum nächsten Wert).
+# max_sub_interval: rechnet auch weiter, wenn sich der Wert länger nicht ändert (z. B. nachts 0 W). Die 5 Minuten
+# sind ein Vorschlag: an das Abfrageintervall der Integration anpassen.
+
+sensor:
+  - platform: integration
+    name: SENEC PV erzeugt
+    unique_id: senec_pv_erzeugt
+    source: sensor.senec_solar_generated_power
+    method: left
+    unit_prefix: k
+    unit_time: h
+    round: 2
+    max_sub_interval:
+      minutes: 5
+  - platform: integration
+    name: SENEC Hausverbrauch
+    unique_id: senec_hausverbrauch
+    source: sensor.senec_house_power
+    method: left
+    unit_prefix: k
+    unit_time: h
+    round: 2
+    max_sub_interval:
+      minutes: 5
+  - platform: integration
+    name: SENEC Netzbezug
+    unique_id: senec_netzbezug
+    source: sensor.senec_grid_imported_power
+    method: left
+    unit_prefix: k
+    unit_time: h
+    round: 2
+    max_sub_interval:
+      minutes: 5
+  - platform: integration
+    name: SENEC Einspeisung
+    unique_id: senec_einspeisung
+    source: sensor.senec_grid_exported_power
+    method: left
+    unit_prefix: k
+    unit_time: h
+    round: 2
+    max_sub_interval:
+      minutes: 5
+  - platform: integration
+    name: SENEC Akku geladen
+    unique_id: senec_akku_geladen
+    source: sensor.senec_battery_charge_power
+    method: left
+    unit_prefix: k
+    unit_time: h
+    round: 2
+    max_sub_interval:
+      minutes: 5
+  - platform: integration
+    name: SENEC Akku entladen
+    unique_id: senec_akku_entladen
+    source: sensor.senec_battery_discharge_power
+    method: left
+    unit_prefix: k
+    unit_time: h
+    round: 2
+    max_sub_interval:
+      minutes: 5
