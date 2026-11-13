@@ -99,7 +99,12 @@
         target:
           entity_id: input_number.zwangsladen_ziel_soc
         data:
-          value: '{{ state_attr(''sensor.netzladeplan'', ''ziel_soc'') | int(80) }}'
+          value: '{{ [[state_attr(''sensor.netzladeplan'', ''ziel_soc'') | int(80),
+            state_attr(''input_number.zwangsladen_ziel_soc'', ''min'') | int(5)] |
+            max, state_attr(''input_number.zwangsladen_ziel_soc'', ''max'') | int(100)]
+            | min }}'
+        note: 'Auf den Bereich des Helfers begrenzt: 13.11.2026 brach die Automation
+          mit Ziel-SoC 15 % (Helfer-Minimum 20 %) ab und lud nicht.'
       - action: input_boolean.turn_on
         target:
           entity_id: input_boolean.netzladen_durch_automatik

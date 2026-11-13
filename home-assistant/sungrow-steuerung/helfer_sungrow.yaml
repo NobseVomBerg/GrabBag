@@ -57,7 +57,7 @@ input_number:
     icon: mdi:battery-charging-high
   zwangsladen_ziel_soc:       # Ziel-SoC fürs Zwangsladen (die Preis-Automatik setzt ihn selbst)
     name: Zwangsladen Ziel-SoC
-    min: 20
+    min: 5                    # niedrig lassen: der Ladeplan liefert auch kleine Ziele (z. B. 15 %)
     max: 100
     step: 5
     mode: box
