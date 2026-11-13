@@ -473,8 +473,8 @@
     PV-Prognose bringt den Akku wieder aufs Ziel; (2) 10 Minuten nachdem kein Auto
     mehr lädt; (3) manuelles Halten ohne ladendes Auto nach 15 Minuten. Ein manuelles
     Halten während ein Auto lädt bleibt bis zum Ladeende. Erkannt werden die
-    Wallbox und zwei Autos am go-e (über die Fahrzeug-API); das dritte Auto am go-e
-    ist nicht erkennbar. Ein vom Ladeplan gesetztes Halten (input_boolean.akku_halten_durch_plan)
+    Wallbox und zwei Autos am go-e (über die Fahrzeug-API); ein weiteres Auto am go-e
+    ist aktuell nicht erkennbar. Ein vom Ladeplan gesetztes Halten (input_boolean.akku_halten_durch_plan)
     bleibt unberührt; gibt der Plan es ab, und alle 10 min als Sicherheitsnetz, wird
     erneut geprüft.'
   triggers:

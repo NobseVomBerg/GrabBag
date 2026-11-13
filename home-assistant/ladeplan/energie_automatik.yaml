@@ -106,7 +106,7 @@ template:
     device_class: power
     icon: mdi:car-electric
     # Wallbox gemessen; lädt eines der beiden Autos zu Hause ohne die Wallbox, hängt es am go-e -> Leistung aus der Fahrzeug-API.
-    # Das dritte Auto am go-e ist nicht erkennbar.
+    # Ein Auto am go-e ist aktuell nicht erkennbar.
     # Fahrzeug-API nur mit frischen Daten (< 20 min, die Integration fragt alle 11 min ab): Die Autos laden beim Einstecken
     # nur Sekunden und schlafen dann ein, in der Integration bleibt "lädt mit 4 kW" stehen (04.11.2026: 14 h Akku-Schutz
     # ohne ladendes Auto). Außerdem höchstens der gemessene Hausverbrauch (go-e und Wallbox hängen mit dran).
@@ -124,7 +124,7 @@ template:
       {% endfor %}
       {{ ([ns.p, states('sensor.sum_load_power') | float(99999)] | min / 100) | round(0) * 100 }}
   # Hausverbrauch ohne die erkannten Autos (Wallbox + auto_1/auto_2 am go-e) - Grundlage für den 14-Tage-Schnitt im Ladeplan.
-  # Das dritte Auto (meist 2-kW-Lader) ist nicht erkennbar und zählt mit.
+  # Ein weiteres Auto am go-e (meist 2-kW-Lader) ist aktuell nicht erkennbar und zählt mit.
   - name: Hausverbrauch ohne Autos
     unique_id: hausverbrauch_ohne_autos
     unit_of_measurement: W
