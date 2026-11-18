@@ -6,6 +6,18 @@ kopiert hat, sieht so, ob sich daran etwas getan hat.
 Releases heißen nach Jahr, Monat und laufender Nummer (`2026.11.0`) und bündeln die Einträge seit dem letzten
 Release. Die Nummer sagt nichts über Kompatibilität: Die Ordner sind unabhängig voneinander.
 
+## 2026.11.1 (2026-11-18)
+
+### 2026-11-18
+
+#### Behoben
+
+- **home-assistant/sungrow-steuerung:** „Preis-Automatik: Laden nach Plan" reagierte nur auf Zustandswechsel des
+  Plans. Lehnte das Skript das Zwangsladen ab (Phasengrenze oder Netzbudget ausgeschöpft, z. B. weil ein Auto
+  lädt), blieb es bis zum nächsten Wechsel ohne Ladung. Die Automation fasst jetzt alle 5 Minuten nach, solange
+  der Plan laden will (`automations_preis_automatik.yaml`: neuer Trigger `nachfassen` und eine Bedingung dazu).
+  Wer die Datei schon übernommen hat: Trigger, Bedingung und Beschreibung nachziehen.
+
 ## 2026.11.0 (2026-11-14)
 
 Erstes Release mit dem gesamten Stand bis hierher.

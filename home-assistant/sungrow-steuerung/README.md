@@ -17,6 +17,7 @@ hervorgehoben (card_mod).*
 - **Neustart:** Nach einem Neustart von Home Assistant läuft kein Zwangsladen unbeaufsichtigt weiter.
 - **Backup-Reserve:** Regler in HA und Register im Wechselrichter bleiben in beide Richtungen synchron.
 - **Preis-Automatik:** setzt den [Ladeplan](../ladeplan/) um und lässt echten PV-Überschuss trotz Halten in den Akku.
+  Scheitert das Laden an Budget oder Phasengrenze (z. B. weil ein Auto lädt), versucht sie es alle 5 Minuten erneut.
 
 ## Dateien
 

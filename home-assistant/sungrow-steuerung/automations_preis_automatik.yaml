@@ -28,7 +28,10 @@
     Halten haben Vorrang. Waehrend ''halten'' darf ''Preis-Automatik: PV-Ueberschuss
     trotz Halten in den Akku'' fuer PV-Ueberschuss kurz auf Normalbetrieb gehen (input_boolean.akku_halten_pause_fur_pv_uberschuss).
     Unbekannte Plan- oder WR-Zustaende (Template-Reload, Neustart) werden uebergangen;
-    sobald die WR-Modi wieder bekannt sind, wird der Plan erneut umgesetzt.'
+    sobald die WR-Modi wieder bekannt sind, wird der Plan erneut umgesetzt. Alle 5
+    min wird nachgefasst, solange der Plan laden will: lehnt das Skript das Laden
+    ab (Phasengrenze oder Budget durch Autoladen ausgeschoepft), startet es, sobald
+    wieder Leistung frei ist.'
   triggers:
   - trigger: state
     entity_id: sensor.netzladeplan
@@ -47,6 +50,13 @@
     - unavailable
     - unknown
     note: 'WR-Modus wieder bekannt (nach Template-Reload/Neustart): Plan erneut umsetzen'
+  - trigger: time_pattern
+    minutes: /5
+    seconds: 35
+    id: nachfassen
+    note: 'Laden erneut versuchen: lehnt das Skript ab (Phase/Budget voll, z. B. Auto
+      laedt), blieb der Plan sonst bis zum naechsten Zustandswechsel ohne Ladung (18.11.2026:
+      03:45-05:35)'
   conditions:
   - condition: state
     entity_id: input_boolean.preis_automatik
@@ -72,6 +82,10 @@
       - unknown
     note: 'Waehrend eines Template-Reloads sind Plan und WR-Modi kurz unbekannt: dann
       nichts tun, sonst geht das Plan-Flag verloren und der Akku bleibt gehalten (09.11.2026)'
+  - condition: template
+    alias: Nachfassen nur, solange der Plan laden will
+    value_template: '{{ trigger.id | default('''') != ''nachfassen'' or is_state(''sensor.netzladeplan'',
+      ''laden'') }}'
   actions:
   - choose:
     - alias: Manuelles Zwangsladen läuft - nichts tun
