@@ -4,11 +4,17 @@
 # Automationen:
 #   - je Raum: Heizkörper folgt Soll/Ist des Wandthermostats (mit Hysterese), Fenster/Tür offen -> aus
 #   - Soll nach 2 h zurück aufs Programm: manuelles Verstellen am Wandthermostat gilt nur 2 Stunden
+#   - Raum wird trotz Aus wärmer: Meldung aufs Handy, wenn ein Raum 30 min lang wärmer wird, obwohl sein
+#     Heizkörper aus ist (Ventil schließt nicht oder der Aus-Befehl kam nicht an)
 #
 # Braucht:
 #   - script.heizung_raum_regeln aus scripts_heizung.yaml
 #   - je Raum ein Wandthermostat und ein Heizkörperthermostat (climate.*) sowie Fensterkontakte
-#   - Timer aus helfer_heizung.yaml
+#   - Timer und Trend-Helfer (binary_sensor.raumtemperatur_*_steigt) aus helfer_heizung.yaml
+#
+# Anpassen:
+#   - notify.mobile_app_DEIN_HANDY ist ein Platzhalter: den Meldedienst des eigenen Handys eintragen
+#   - weather.forecast_home_assistant durch die eigene Wetter-Entität ersetzen (Außentemperatur)
 #
 # Einbinden: in der UI je Automation neu anlegen, "In YAML bearbeiten" und den Block einfügen
 # (bleibt in der UI editierbar). Oder die ganze Datei in configuration.yaml einbinden:
@@ -30,7 +36,7 @@
     entity_id:
     - binary_sensor.balkontuer_og_wohnz
     - binary_sensor.fenster_og_kuche
-    - binary_sensor.balkontur_dg_kuche
+    - binary_sensor.balkontur_og_kuche
   - trigger: state
     entity_id: timer.wohnzimmer_soll_zurucksetzen
     to: active
@@ -48,8 +54,9 @@
       fenster:
       - binary_sensor.balkontuer_og_wohnz
       - binary_sensor.fenster_og_kuche
-      - binary_sensor.balkontur_dg_kuche
+      - binary_sensor.balkontur_og_kuche
       timer: timer.wohnzimmer_soll_zurucksetzen
+      steigt: binary_sensor.raumtemperatur_wohnzimmer_steigt
   mode: queued
   max: 3
 - id: heizung_schlafzimmer
@@ -84,6 +91,7 @@
       - binary_sensor.fenster_og_schlafz
       - binary_sensor.balkontuer_og_schlafz
       timer: timer.schlafzimmer_soll_zurucksetzen
+      steigt: binary_sensor.raumtemperatur_schlafzimmer_steigt
   mode: queued
   max: 3
 - id: heizung_buero_1
@@ -125,6 +133,7 @@
       - binary_sensor.fenster_eg_buro1_3
       - binary_sensor.fenster_eg_kuche
       timer: timer.buro_1_soll_zurucksetzen
+      steigt: binary_sensor.raumtemperatur_buro_1_steigt
   mode: queued
   max: 3
 - id: heizung_buero_2
@@ -155,6 +164,7 @@
       fenster:
       - binary_sensor.fenster_eg_buro2_dreh_window_state
       timer: timer.buro_2_soll_zurucksetzen
+      steigt: binary_sensor.raumtemperatur_buro_2_steigt
   mode: queued
   max: 3
 - id: heizung_soll_zuruecksetzen
@@ -274,3 +284,68 @@
       = p.temperature %}{% endfor %}{{ ns.soll }}{% else %}18{% endif %}'
   mode: queued
   max: 10
+- id: heizung_raum_trotz_aus_waermer
+  alias: 'Heizung: Raum wird trotz Aus wärmer'
+  description: 'Meldet aufs Handy, wenn ein Raum 30 min lang wärmer wird (Trend-Helfer,
+    mehr als 0,3 °C je Stunde), obwohl sein Heizkörper aus ist, der Raum mindestens
+    1 °C über Soll liegt und es draußen unter 15 °C hat - dann schließt das Ventil
+    nicht oder ein Aus-Befehl kam nicht an (19.11.2026: Schlafzimmer heizte von 00:00
+    bis mittags auf 26 °C). Eine Meldung je Fehlerfall; script.heizung_raum_regeln
+    wiederholt parallel den Aus-Befehl. Weiterer Raum: Trigger und ''raeume'' ergänzen.'
+  triggers:
+  - trigger: template
+    value_template: '{{ is_state(''binary_sensor.raumtemperatur_wohnzimmer_steigt'',
+      ''on'') and (is_state(''climate.heizth_og_wohnz'', ''off'') or state_attr(''climate.heizth_og_wohnz'',
+      ''temperature'') | float(99) <= 5) and state_attr(''climate.wandth_og_wnz'',
+      ''current_temperature'') | float(-99) >= state_attr(''climate.wandth_og_wnz'',
+      ''temperature'') | float(99) + 1 and state_attr(''weather.forecast_home_assistant'',
+      ''temperature'') | float(99) < 15 }}'
+    for:
+      minutes: 30
+    id: Wohnzimmer
+  - trigger: template
+    value_template: '{{ is_state(''binary_sensor.raumtemperatur_schlafzimmer_steigt'',
+      ''on'') and (is_state(''climate.heizth_og_schlafz'', ''off'') or state_attr(''climate.heizth_og_schlafz'',
+      ''temperature'') | float(99) <= 5) and state_attr(''climate.wandth_og_schlafz'',
+      ''current_temperature'') | float(-99) >= state_attr(''climate.wandth_og_schlafz'',
+      ''temperature'') | float(99) + 1 and state_attr(''weather.forecast_home_assistant'',
+      ''temperature'') | float(99) < 15 }}'
+    for:
+      minutes: 30
+    id: Schlafzimmer
+  - trigger: template
+    value_template: '{{ is_state(''binary_sensor.raumtemperatur_buro_1_steigt'', ''on'')
+      and (is_state(''climate.heizth_eg_buro1'', ''off'') or state_attr(''climate.heizth_eg_buro1'',
+      ''temperature'') | float(99) <= 5) and state_attr(''climate.wandth_eg_buro1'',
+      ''current_temperature'') | float(-99) >= state_attr(''climate.wandth_eg_buro1'',
+      ''temperature'') | float(99) + 1 and state_attr(''weather.forecast_home_assistant'',
+      ''temperature'') | float(99) < 15 }}'
+    for:
+      minutes: 30
+    id: Büro 1
+  - trigger: template
+    value_template: '{{ is_state(''binary_sensor.raumtemperatur_buro_2_steigt'', ''on'')
+      and (is_state(''climate.heizth_eg_buro2'', ''off'') or state_attr(''climate.heizth_eg_buro2'',
+      ''temperature'') | float(99) <= 5) and state_attr(''climate.wandth_eg_buro2'',
+      ''current_temperature'') | float(-99) >= state_attr(''climate.wandth_eg_buro2'',
+      ''temperature'') | float(99) + 1 and state_attr(''weather.forecast_home_assistant'',
+      ''temperature'') | float(99) < 15 }}'
+    for:
+      minutes: 30
+    id: Büro 2
+  conditions: []
+  actions:
+  - action: notify.mobile_app_DEIN_HANDY
+    data:
+      title: 'Heizung: {{ trigger.id }} wird trotz Aus wärmer'
+      message: '{{ trigger.id }}: Raum {{ state_attr(raeume[trigger.id], ''current_temperature'')
+        }} °C bei Soll {{ state_attr(raeume[trigger.id], ''temperature'') }} °C, Heizkörper
+        steht auf Aus. Ventil prüfen (Stift fest?) oder Funk gestört.'
+  mode: queued
+  max: 4
+  variables:
+    raeume:
+      Wohnzimmer: climate.wandth_og_wnz
+      Schlafzimmer: climate.wandth_og_schlafz
+      Büro 1: climate.wandth_eg_buro1
+      Büro 2: climate.wandth_eg_buro2

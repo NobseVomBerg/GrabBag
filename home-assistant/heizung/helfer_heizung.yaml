@@ -1,9 +1,15 @@
-# Heizung: Timer für "Soll nach 2 h zurück aufs Programm" (automations_heizung.yaml)
-# Aus https://github.com/NobseVomBerg/GrabBag - MIT-Lizenz, ohne Gewähr.
+# Heizung: Timer für "Soll nach 2 h zurück aufs Programm" und Trend-Helfer "Raumtemperatur steigt"
+# (automations_heizung.yaml, scripts_heizung.yaml)
+# Aus https://github.com/NobseVomBerg/GrabBag - MIT-Lizenz, ohne Gewähr. Entity-IDs an die eigene Anlage anpassen.
 #
 # Als Package einbinden (configuration.yaml: homeassistant: packages: !include_dir_named packages,
-# Datei nach packages/) oder in der UI als Timer mit denselben Namen anlegen.
+# Datei nach packages/) oder in der UI mit denselben Namen anlegen: Timer als Helfer "Timer",
+# die Trend-Helfer als Helfer "Trend" mit denselben Werten.
 # restore: true - ein laufender Timer übersteht einen Neustart von Home Assistant.
+#
+# Trend-Helfer: an, wenn die Raumtemperatur über die letzte Stunde um mehr als 0,3 °C je Stunde steigt
+# (min_gradient in °C je Sekunde: 0,3 / 3600 = 0.0000833). Quelle ist der Temperatursensor des
+# Wandthermostats, nicht dessen climate-Entität: trend wertet den Zustand eines Sensors aus.
 
 timer:
   wohnzimmer_soll_zurucksetzen:
@@ -22,3 +28,35 @@ timer:
     name: Büro 2 Soll zurücksetzen
     duration: "02:00:00"
     restore: true
+
+binary_sensor:
+  - platform: trend
+    sensors:
+      raumtemperatur_wohnzimmer_steigt:
+        friendly_name: Raumtemperatur Wohnzimmer steigt
+        entity_id: sensor.wandth_og_wnz_temperature
+        sample_duration: 3600
+        max_samples: 40
+        min_samples: 3
+        min_gradient: 0.0000833
+      raumtemperatur_schlafzimmer_steigt:
+        friendly_name: Raumtemperatur Schlafzimmer steigt
+        entity_id: sensor.wandth_og_schlafz_temperature
+        sample_duration: 3600
+        max_samples: 40
+        min_samples: 3
+        min_gradient: 0.0000833
+      raumtemperatur_buro_1_steigt:
+        friendly_name: Raumtemperatur Büro 1 steigt
+        entity_id: sensor.wandth_eg_buro1_temperature
+        sample_duration: 3600
+        max_samples: 40
+        min_samples: 3
+        min_gradient: 0.0000833
+      raumtemperatur_buro_2_steigt:
+        friendly_name: Raumtemperatur Büro 2 steigt
+        entity_id: sensor.wandth_eg_buro2_temperature
+        sample_duration: 3600
+        max_samples: 40
+        min_samples: 3
+        min_gradient: 0.0000833

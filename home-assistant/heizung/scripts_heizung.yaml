@@ -4,8 +4,9 @@
 # Skripte:
 #   - heizung_raum_regeln: Heizkörper auf/zu nach Soll/Ist des Raumthermostats, Fenster offen -> aus
 #
-# weather.forecast_home_assistant (Außentemperatur für "Ein wiederholen") durch die eigene Wetter-Entität
-# ersetzen; die 15 °C sind ein Vorschlag. Das 15-Minuten-Raster der Wiederholungen setzt voraus, dass die
+# weather.forecast_home_assistant (Außentemperatur für "Ein wiederholen" und die Trend-Erkennung) durch die
+# eigene Wetter-Entität ersetzen; die 15 °C sind ein Vorschlag. Das Feld "steigt" ist optional: der
+# Trend-Helfer des Raums aus helfer_heizung.yaml. Das 15-Minuten-Raster der Wiederholungen setzt voraus, dass die
 # Raum-Automationen alle 5 Minuten laufen (automations_heizung.yaml).
 #
 # Einbinden: in der UI je Skript neu anlegen, "In YAML bearbeiten" und den Inhalt unter dem Schlüssel
@@ -33,7 +34,11 @@ heizung_raum_regeln:
     auf 26 °C). ''Ein wiederholen'' - der Heizkörper zeigt Heizen, der Raum liegt
     aber mindestens 1 °C unter Soll und der Fühler am Heizkörper höchstens 0,3 °C
     über dem Raum; nur bei unter 15 °C Außentemperatur (weather.forecast_home_assistant),
-    weil die Heizung sonst ohnehin nicht läuft.'
+    weil die Heizung sonst ohnehin nicht läuft. ''Aus wiederholen'' greift auch, wenn
+    der Raum trotz Aus wärmer wird (optionales Feld ''steigt'': Trend-Helfer der Raumtemperatur,
+    mehr als 0,3 °C je Stunde) und es draußen unter 15 °C hat - am 19.11.2026 lag
+    der Heizkörperfühler nur 0,7 °C über dem Raum, obwohl das Ventil offen stand.
+    Dazu meldet ''Heizung: Raum wird trotz Aus wärmer'' den Fall aufs Handy.'
   mode: parallel
   max: 4
   icon: mdi:radiator
@@ -63,6 +68,12 @@ heizung_raum_regeln:
       selector:
         entity:
           domain: timer
+    steigt:
+      name: 'Trend-Helfer: Raumtemperatur steigt'
+      required: false
+      selector:
+        entity:
+          domain: binary_sensor
   sequence:
   - variables:
       ist: '{{ state_attr(thermostat, ''current_temperature'') }}'
@@ -128,9 +139,11 @@ heizung_raum_regeln:
       conditions:
       - condition: template
         value_template: '{{ not heizen and hk_zu and not offen and is_number(ist)
-          and is_number(state_attr(heizkoerper, ''current_temperature'')) and ist
-          | float >= soll + 1 and state_attr(heizkoerper, ''current_temperature'')
-          | float >= ist | float + 0.8 and now().minute % 15 == 0 }}'
+          and ist | float >= soll + 1 and now().minute % 15 == 0 and ((is_number(state_attr(heizkoerper,
+          ''current_temperature'')) and state_attr(heizkoerper, ''current_temperature'')
+          | float >= ist | float + 0.8) or (steigt is defined and steigt | length
+          > 0 and is_state(steigt, ''on'') and state_attr(''weather.forecast_home_assistant'',
+          ''temperature'') | float(99) < 15)) }}'
       sequence:
       - action: climate.set_hvac_mode
         target:
