@@ -16,6 +16,7 @@ und die Grenzwerte an die eigene Anlage anpassen.
 | [senec-auswertung/](senec-auswertung/) | Dashboard-Ansicht für einen SENEC.Home-Speicher (Integration marq24/ha-senec-v3): Live-Werte, Ladestand je Akku-Modul und Energie pro Tag aus selbst aufsummierten Zählern. |
 | [heizung/](heizung/) | Heizkörperthermostate folgen einem Raumthermostat (Homematic / Homematic IP), Fenster offen → aus, manuelles Verstellen gilt 2 Stunden (Lüften zählt nicht mit). |
 | [jalousien/](jalousien/) | Jalousien nach Sonnenstand (Shelly 2PM Gen3), mit Wiederholung bei Verbindungsabbrüchen. |
+| [meldungen/](meldungen/) | Push-Meldungen aufs Handy für Fälle, in denen jemand eingreifen muss: Phasengrenze überschritten, Wassermelder, Fenster bei Kälte lange offen. |
 | [recorder/](recorder/) | Datenbank klein halten: Aufräumen ohne Repack, laute Sensoren nur wenige Tage behalten. |
 | [ha-config-git/](ha-config-git/) | Die Konfiguration über ha-mcp in ein Git-Repo spiegeln, z. B. aus einer Claude-Code-Session heraus. |
 

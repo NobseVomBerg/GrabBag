@@ -27,6 +27,7 @@ und lass sie das Setup anpassen. Wie genau, steht in der Setup-Datei.
 | [senec-auswertung/](home-assistant/senec-auswertung/) | SENEC-Speicher: Live-Werte, Akku-Module und Energie pro Tag aus selbst aufsummierten Zählern |
 | [heizung/](home-assistant/heizung/) | Heizkörper folgen dem Raumthermostat, Fenster offen → aus |
 | [jalousien/](home-assistant/jalousien/) | Jalousien nach Sonnenstand, robust gegen WLAN-Aussetzer |
+| [meldungen/](home-assistant/meldungen/) | Push-Meldungen aufs Handy: Phasengrenze, Wassermelder, Fenster bei Kälte offen |
 | [recorder/](home-assistant/recorder/) | Datenbank klein halten |
 | [ha-config-git/](home-assistant/ha-config-git/) | HA-Konfiguration über ha-mcp ins Git spiegeln |
 

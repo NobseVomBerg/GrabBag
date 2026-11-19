@@ -1,0 +1,115 @@
+# Meldungen aufs Handy: Phasengrenze überschritten, Wassermelder, Fenster bei Kälte lange offen
+# Aus https://github.com/NobseVomBerg/GrabBag - MIT-Lizenz, ohne Gewähr. Entity-IDs an die eigene Anlage anpassen.
+#
+# Automationen:
+#   - Phasengrenze überschritten: stärkste Phase am Netzzähler 1 min über 30 A
+#   - Wassermelder: ein Melder wechselt von trocken auf nass (nicht nach einem Funkausfall)
+#   - Fenster bei Kälte lange offen: Fenster oder Außentür 30 min offen und draußen unter 10 °C
+#
+# Braucht:
+#   - die Companion-App auf dem Handy (stellt den Dienst notify.mobile_app_<gerät> bereit)
+#   - Phasengrenze: sensor.netz_max_phasenstrom aus ../sungrow-steuerung/helfer_sungrow.yaml, sensor.import_power
+#     aus ../sungrow-modbus/ und sensor.autoladeleistung aus ../ladeplan/energie_automatik.yaml.
+#     Ohne diese Vorlagen: eigenen Sensor für den Phasenstrom nehmen und den Meldungstext kürzen.
+#   - Wassermelder und Fensterkontakte als binary_sensor (Hersteller beliebig)
+#
+# Anpassen:
+#   - notify.mobile_app_DEIN_HANDY ist ein Platzhalter: den Meldedienst des eigenen Handys eintragen
+#   - weather.forecast_home_assistant durch die eigene Wetter-Entität ersetzen (Außentemperatur)
+#   - die Listen der Melder, Fenster und Türen; die Schwellen (30 A, 10 °C, 30 min) sind Beispielwerte
+#
+# Einbinden: in der UI je Automation neu anlegen, "In YAML bearbeiten" und den Block einfügen
+# (bleibt in der UI editierbar). Oder die ganze Datei in configuration.yaml einbinden:
+#   automation meldungen: !include automations_meldungen.yaml
+# (dann in der UI nur lesbar).
+
+- id: meldung_phasengrenze
+  alias: 'Meldung: Phasengrenze überschritten'
+  description: 'Meldet aufs Handy, wenn die stärkste Phase am Netzzähler 1 min lang
+    über 30 A liegt (13.11.2026: zwei Sicherungen ausgelöst bei 41 und 47 A; Autos,
+    Boiler, Herd). Die Automatik regelt nur die Hausakkus, nicht die Autos - hier
+    hilft nur selbst drosseln. Höchstens eine Meldung, bis die Phase wieder unter
+    30 A war.'
+  triggers:
+  - trigger: numeric_state
+    entity_id: sensor.netz_max_phasenstrom
+    above: 30
+    for:
+      minutes: 1
+  conditions:
+  - condition: template
+    alias: Nicht nach Ausfall des Sensors
+    value_template: '{{ trigger.from_state is not none and trigger.from_state.state
+      not in [''unavailable'', ''unknown''] }}'
+  actions:
+  - action: notify.mobile_app_DEIN_HANDY
+    data:
+      title: Phase über 30 A
+      message: 'Stärkste Phase {{ states(''sensor.netz_max_phasenstrom'') }} A, Netzbezug
+        {{ (states(''sensor.import_power'') | float(0) / 1000) | round(1) }} kW, Autos
+        {{ (states(''sensor.autoladeleistung'') | float(0) / 1000) | round(1) }} kW.
+        Sicherung in Gefahr: Verbraucher drosseln.'
+  mode: single
+- id: meldung_wassermelder
+  alias: 'Meldung: Wassermelder'
+  description: 'Meldet aufs Handy, sobald ein Wassermelder Feuchtigkeit oder Wasserstand
+    erkennt (Küche OG, Bad UG). Nur beim Wechsel von trocken auf nass, nicht wenn
+    ein Melder nach einem Funkausfall zurückkommt. Weiterer Melder: in den Trigger
+    eintragen (der Melder an der Gasheizung fehlt, solange er nicht erreichbar ist).'
+  triggers:
+  - trigger: state
+    entity_id:
+    - binary_sensor.feuchte_og_kuche_moisture_detected
+    - binary_sensor.feuchte_og_kuche_waterlevel_detected
+    - binary_sensor.ug_badezimmer_wasser_ug_bad_1_moisture_detected
+    - binary_sensor.ug_badezimmer_wasser_ug_bad_1_waterlevel_detected
+    from: 'off'
+    to: 'on'
+  conditions: []
+  actions:
+  - action: notify.mobile_app_DEIN_HANDY
+    data:
+      title: Wasser erkannt!
+      message: '{{ trigger.to_state.name }} meldet Wasser ({{ now().strftime(''%H:%M'')
+        }}).'
+  mode: queued
+  max: 5
+- id: meldung_fenster_bei_kaelte_offen
+  alias: 'Meldung: Fenster bei Kälte lange offen'
+  description: Meldet aufs Handy, wenn ein Fenster oder eine Außentür der Wohnräume
+    (EG, OG, Haustür) 30 min offen steht und es draußen unter 10 °C hat (weather.forecast_home_assistant).
+    Kellerfenster und Verbindungstüren sind bewusst nicht dabei. Eine Meldung je Öffnung.
+  triggers:
+  - trigger: state
+    entity_id:
+    - binary_sensor.fenster_og_schlafz
+    - binary_sensor.balkontuer_og_schlafz
+    - binary_sensor.fenster_og_kuche
+    - binary_sensor.balkontur_og_kuche
+    - binary_sensor.balkontuer_og_wohnz
+    - binary_sensor.fenster_og_bad
+    - binary_sensor.fenster_eg_bad
+    - binary_sensor.fenster_eg_kuche
+    - binary_sensor.fenster_eg_buro1_essecke
+    - binary_sensor.fenster_eg_buro1_1
+    - binary_sensor.fenster_eg_buro1_2
+    - binary_sensor.fenster_eg_buro1_3
+    - binary_sensor.fenster_eg_buro2_dreh_window_state
+    - binary_sensor.haustur
+    from: 'off'
+    to: 'on'
+    for:
+      minutes: 30
+  conditions:
+  - condition: numeric_state
+    entity_id: weather.forecast_home_assistant
+    attribute: temperature
+    below: 10
+  actions:
+  - action: notify.mobile_app_DEIN_HANDY
+    data:
+      title: Fenster seit 30 min offen
+      message: '{{ trigger.to_state.name }} ist seit 30 min offen, draußen {{ state_attr(''weather.forecast_home_assistant'',
+        ''temperature'') }} °C.'
+  mode: queued
+  max: 10

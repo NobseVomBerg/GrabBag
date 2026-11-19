@@ -10,6 +10,22 @@ Release. Die Nummer sagt nichts über Kompatibilität: Die Ordner sind unabhäng
 
 ### 2026-11-19
 
+#### Neu
+
+- **home-assistant/meldungen:** Neue Vorlage mit drei Push-Meldungen aufs Handy: Phasengrenze überschritten
+  (stärkste Phase 1 Minute über 30 A), Wassermelder und Fenster bei Kälte lange offen (30 Minuten, draußen
+  unter 10 °C). Die README erklärt, warum Push auch unterwegs ankommt, ohne dass Home Assistant von außen
+  erreichbar ist.
+- **home-assistant/heizung:** Erkennung „Raum wird trotz Aus wärmer". Ein Trend-Helfer je Raum
+  (`helfer_heizung.yaml`, mehr als 0,3 °C je Stunde) zeigt, dass die Raumtemperatur steigt. Steht der
+  Heizkörper dabei auf „Aus", wiederholt `heizung_raum_regeln` den Aus-Befehl auch dann, wenn der Fühler am
+  Heizkörper kaum wärmer ist als der Raum (neues optionales Feld `steigt`). Hält der Zustand 30 Minuten an,
+  meldet die neue Automation „Heizung: Raum wird trotz Aus wärmer" den Fall aufs Handy
+  (`automations_heizung.yaml`), denn bei einem Ventil, das mechanisch nicht schließt, hilft Wiederholen nicht.
+  Anzupassen: `notify.mobile_app_DEIN_HANDY` und `weather.forecast_home_assistant`.
+  Wer die Dateien schon übernommen hat: Helfer, Skript und Automationen nachziehen; die vier
+  Raum-Automationen übergeben zusätzlich `steigt`.
+
 #### Behoben
 
 - **home-assistant/heizung:** Ging ein Befehl an ein Heizkörperthermostat per Funk verloren, zeigte Home
