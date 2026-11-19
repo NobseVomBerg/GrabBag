@@ -12,12 +12,19 @@ Release. Die Nummer sagt nichts über Kompatibilität: Die Ordner sind unabhäng
 
 #### Behoben
 
-- **home-assistant/heizung:** Ging ein Aus-Befehl an ein Heizkörperthermostat per Funk verloren, zeigte Home
-  Assistant „Aus", der Heizkörper heizte aber weiter. Die Regelung sendet nur bei Änderungsbedarf und fasste
-  deshalb nie nach. `heizung_raum_regeln` wiederholt den Aus-Befehl jetzt zur vollen und halben Stunde, wenn
-  der Raum mindestens 1 °C über Soll liegt und der Fühler am Heizkörper mindestens 0,8 °C über dem Raum
-  (`scripts_heizung.yaml`: neuer Zweig „Aus wiederholen").
-  Wer das Skript schon übernommen hat: den Zweig und die Beschreibung nachziehen.
+- **home-assistant/heizung:** Ging ein Befehl an ein Heizkörperthermostat per Funk verloren, zeigte Home
+  Assistant den neuen Zustand, der Heizkörper blieb aber im alten. Die Regelung sendet nur bei Änderungsbedarf
+  und fasste deshalb nie nach. `heizung_raum_regeln` hat jetzt zwei Absicherungen, je höchstens alle 15 Minuten
+  (`scripts_heizung.yaml`):
+  - „Aus wiederholen": Der Heizkörper zeigt „Aus", der Raum liegt aber mindestens 1 °C über Soll und der Fühler
+    am Heizkörper mindestens 0,8 °C über dem Raum.
+  - „Ein wiederholen": Der Heizkörper zeigt „Heizen", der Raum liegt aber mindestens 1 °C unter Soll und der
+    Fühler am Heizkörper höchstens 0,3 °C über dem Raum. Nur bei unter 15 °C Außentemperatur; dafür
+    `weather.forecast_home_assistant` durch die eigene Wetter-Entität ersetzen.
+
+  Die Raum-Automationen laufen dafür alle 5 statt alle 10 Minuten (`automations_heizung.yaml`).
+  Wer die Dateien schon übernommen hat: beide Zweige, die Beschreibung und den Takt nachziehen. Ein zuerst
+  veröffentlichter Zwischenstand wiederholte nur „Aus" und nur zur vollen und halben Stunde.
 
 ## 2026.11.1 (2026-11-18)
 

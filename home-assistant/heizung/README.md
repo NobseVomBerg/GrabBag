@@ -15,9 +15,15 @@ sobald er warm genug ist oder ein Fenster aufgeht.
 - Manuelles Verstellen am Wandthermostat gilt **2 Stunden**, danach zurück aufs Wochenprogramm. Solange ein Fenster
   offen ist, ruht dieser Timer. Sonst verbraucht das Lüften die 2 Stunden.
 - Neuere HmIP-Thermostate kennen kein „Aus" und gehen auf 5 °C. Das zählt ebenfalls als zu.
-- **Aus wiederholen:** Zeigt der Heizkörper „Aus", der Raum liegt aber mindestens 1 °C über Soll und der Fühler
-  am Heizkörper mindestens 0,8 °C über dem Raum, geht der Aus-Befehl zur vollen und halben Stunde erneut raus.
-  Das fängt einen per Funk verlorenen Befehl ab, nach dem der Heizkörper sonst unbemerkt weiterheizt.
+- Zwei Absicherungen gegen per Funk verlorene Befehle, je höchstens alle 15 Minuten:
+  - **Aus wiederholen:** Der Heizkörper zeigt „Aus", der Raum liegt aber mindestens 1 °C über Soll und der Fühler
+    am Heizkörper mindestens 0,8 °C über dem Raum. Sonst heizt er unbemerkt weiter.
+  - **Ein wiederholen:** Der Heizkörper zeigt „Heizen", der Raum liegt aber mindestens 1 °C unter Soll und der
+    Fühler am Heizkörper höchstens 0,3 °C über dem Raum. Nur bei unter 15 °C Außentemperatur, weil die Heizung
+    sonst ohnehin nicht läuft.
+
+  Die Außentemperatur kommt aus `weather.forecast_home_assistant`: durch die eigene Wetter-Entität ersetzen,
+  die 15 °C sind ein Vorschlag. Die Raum-Automationen laufen dafür alle 5 Minuten.
 
 ## Dateien
 

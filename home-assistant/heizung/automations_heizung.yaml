@@ -36,7 +36,7 @@
     to: active
     note: '2-h-Timer gestartet: bei offenem Fenster gleich anhalten'
   - trigger: time_pattern
-    minutes: /10
+    minutes: /5
   - trigger: homeassistant
     event: start
   conditions: []
@@ -71,7 +71,7 @@
     to: active
     note: '2-h-Timer gestartet: bei offenem Fenster gleich anhalten'
   - trigger: time_pattern
-    minutes: /10
+    minutes: /5
   - trigger: homeassistant
     event: start
   conditions: []
@@ -109,7 +109,7 @@
     to: active
     note: '2-h-Timer gestartet: bei offenem Fenster gleich anhalten'
   - trigger: time_pattern
-    minutes: /10
+    minutes: /5
   - trigger: homeassistant
     event: start
   conditions: []
@@ -143,7 +143,7 @@
     to: active
     note: '2-h-Timer gestartet: bei offenem Fenster gleich anhalten'
   - trigger: time_pattern
-    minutes: /10
+    minutes: /5
   - trigger: homeassistant
     event: start
   conditions: []
