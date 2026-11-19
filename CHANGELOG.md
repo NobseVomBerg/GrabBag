@@ -6,6 +6,19 @@ kopiert hat, sieht so, ob sich daran etwas getan hat.
 Releases heißen nach Jahr, Monat und laufender Nummer (`2026.11.0`) und bündeln die Einträge seit dem letzten
 Release. Die Nummer sagt nichts über Kompatibilität: Die Ordner sind unabhängig voneinander.
 
+## Noch nicht in einem Release
+
+### 2026-11-19
+
+#### Behoben
+
+- **home-assistant/heizung:** Ging ein Aus-Befehl an ein Heizkörperthermostat per Funk verloren, zeigte Home
+  Assistant „Aus", der Heizkörper heizte aber weiter. Die Regelung sendet nur bei Änderungsbedarf und fasste
+  deshalb nie nach. `heizung_raum_regeln` wiederholt den Aus-Befehl jetzt zur vollen und halben Stunde, wenn
+  der Raum mindestens 1 °C über Soll liegt und der Fühler am Heizkörper mindestens 0,8 °C über dem Raum
+  (`scripts_heizung.yaml`: neuer Zweig „Aus wiederholen").
+  Wer das Skript schon übernommen hat: den Zweig und die Beschreibung nachziehen.
+
 ## 2026.11.1 (2026-11-18)
 
 ### 2026-11-18

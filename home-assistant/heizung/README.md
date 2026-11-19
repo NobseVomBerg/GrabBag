@@ -15,6 +15,9 @@ sobald er warm genug ist oder ein Fenster aufgeht.
 - Manuelles Verstellen am Wandthermostat gilt **2 Stunden**, danach zurück aufs Wochenprogramm. Solange ein Fenster
   offen ist, ruht dieser Timer. Sonst verbraucht das Lüften die 2 Stunden.
 - Neuere HmIP-Thermostate kennen kein „Aus" und gehen auf 5 °C. Das zählt ebenfalls als zu.
+- **Aus wiederholen:** Zeigt der Heizkörper „Aus", der Raum liegt aber mindestens 1 °C über Soll und der Fühler
+  am Heizkörper mindestens 0,8 °C über dem Raum, geht der Aus-Befehl zur vollen und halben Stunde erneut raus.
+  Das fängt einen per Funk verlorenen Befehl ab, nach dem der Heizkörper sonst unbemerkt weiterheizt.
 
 ## Dateien
 

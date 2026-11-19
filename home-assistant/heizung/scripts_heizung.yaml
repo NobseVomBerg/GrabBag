@@ -22,7 +22,11 @@ heizung_raum_regeln:
     (Heizung: Soll nach 2 h zurück aufs Programm) ruht, solange ein Fenster oder eine
     Tür offen ist, und läuft weiter, wenn alles zu ist - sonst verbraucht das Lüften
     die 2 h (12.11.2026: 22,5 °C bei offener Küche eingestellt, nach dem Schließen
-    blieben nur 44 min).'
+    blieben nur 44 min). Absicherung ''Aus wiederholen'': Zeigt der Heizkörper Aus,
+    der Raum liegt aber mindestens 1 °C über Soll und der Fühler am Heizkörper mindestens
+    0,8 °C über dem Raum, wird der Aus-Befehl zur vollen und halben Stunde erneut
+    gesendet - ein per Funk verlorener Aus-Befehl ließ das Schlafzimmer am 19.11.2026
+    von 00:00 bis 12:30 auf 26 °C heizen.'
   mode: parallel
   max: 4
   icon: mdi:radiator
@@ -113,3 +117,17 @@ heizung_raum_regeln:
           entity_id: '{{ heizkoerper }}'
         data:
           hvac_mode: 'off'
+    - alias: Aus wiederholen (Heizkörper heizt trotz Aus weiter)
+      conditions:
+      - condition: template
+        value_template: '{{ not heizen and hk_zu and not offen and is_number(ist)
+          and is_number(state_attr(heizkoerper, ''current_temperature'')) and ist
+          | float >= soll + 1 and state_attr(heizkoerper, ''current_temperature'')
+          | float >= ist | float + 0.8 and now().minute % 30 == 0 }}'
+      sequence:
+      - action: climate.set_hvac_mode
+        target:
+          entity_id: '{{ heizkoerper }}'
+        data:
+          hvac_mode: 'off'
+        continue_on_error: true
