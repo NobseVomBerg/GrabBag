@@ -10,6 +10,12 @@
 # Trend-Helfer: an, wenn die Raumtemperatur über die letzte Stunde um mehr als 0,3 °C je Stunde steigt
 # (min_gradient in °C je Sekunde: 0,3 / 3600 = 0.0000833). Quelle ist der Temperatursensor des
 # Wandthermostats, nicht dessen climate-Entität: trend wertet den Zustand eines Sensors aus.
+#
+# Raumtemperatur Büro 1: Mittelwert aus dem Temperatursensor des Wandthermostats und einem zweiten Raumfühler
+# (sensor.raumfuehler_eg_buro1_temperature ist ein Platzhalter), für Räume, in denen das Wandthermostat falsch
+# misst (Zugluft, Klimaanlage). In der UI: Helfer "Kombiniere den Zustand mehrerer Sensoren", Mittelwert,
+# 1 Nachkommastelle. Ein ausgefallener Fühler wird ignoriert. Die Entität muss sensor.raumtemperatur_buro_1
+# heißen: Automation, Trend-Helfer und Meldung verwenden sie.
 
 timer:
   wohnzimmer_soll_zurucksetzen:
@@ -28,6 +34,19 @@ timer:
     name: Büro 2 Soll zurücksetzen
     duration: "02:00:00"
     restore: true
+  kinderzimmer_soll_zurucksetzen:
+    name: Kinderzimmer Soll zurücksetzen
+    duration: "02:00:00"
+    restore: true
+
+sensor:
+  - platform: min_max
+    name: Raumtemperatur Büro 1
+    type: mean
+    round_digits: 1
+    entity_ids:
+      - sensor.wandth_eg_buro1_temperature
+      - sensor.raumfuehler_eg_buro1_temperature
 
 binary_sensor:
   - platform: trend
@@ -48,7 +67,7 @@ binary_sensor:
         min_gradient: 0.0000833
       raumtemperatur_buro_1_steigt:
         friendly_name: Raumtemperatur Büro 1 steigt
-        entity_id: sensor.wandth_eg_buro1_temperature
+        entity_id: sensor.raumtemperatur_buro_1
         sample_duration: 3600
         max_samples: 40
         min_samples: 3
@@ -56,6 +75,13 @@ binary_sensor:
       raumtemperatur_buro_2_steigt:
         friendly_name: Raumtemperatur Büro 2 steigt
         entity_id: sensor.wandth_eg_buro2_temperature
+        sample_duration: 3600
+        max_samples: 40
+        min_samples: 3
+        min_gradient: 0.0000833
+      raumtemperatur_kinderzimmer_steigt:
+        friendly_name: Raumtemperatur Kinderzimmer steigt
+        entity_id: sensor.wandth_og_kinderz_temperature
         sample_duration: 3600
         max_samples: 40
         min_samples: 3

@@ -14,7 +14,7 @@ und die Grenzwerte an die eigene Anlage anpassen.
 | [ladeplan/](ladeplan/) | Der Plan dahinter: je Viertelstunde laden, halten oder freigeben nach Tibber-Preisen, PV-Prognose und Verbrauch. Dazu Tibber-Preisvorschau, Akku-Schutz beim Autoladen und die Karte „Strompreis effektiv". |
 | [pv-ueberschuss/](pv-ueberschuss/) | Steckdose bei PV-Überschuss zuschalten, mit Hysterese gegen Flattern. |
 | [senec-auswertung/](senec-auswertung/) | Dashboard-Ansicht für einen SENEC.Home-Speicher (Integration marq24/ha-senec-v3): Live-Werte, Ladestand je Akku-Modul und Energie pro Tag aus selbst aufsummierten Zählern. |
-| [heizung/](heizung/) | Heizkörperthermostate folgen einem Raumthermostat (Homematic / Homematic IP), Fenster offen → aus, manuelles Verstellen gilt 2 Stunden (Lüften zählt nicht mit). |
+| [heizung/](heizung/) | Heizkörperthermostate folgen einem Raumthermostat (Homematic / Homematic IP, Shelly BLU TRV), Fenster offen → aus, manuelles Verstellen gilt 2 Stunden (Lüften zählt nicht mit). Dazu eine Variante für Räume ohne Raumthermostat. |
 | [jalousien/](jalousien/) | Jalousien nach Sonnenstand (Shelly 2PM Gen3), mit Wiederholung bei Verbindungsabbrüchen. |
 | [meldungen/](meldungen/) | Push-Meldungen aufs Handy für Fälle, in denen jemand eingreifen muss: Phasengrenze überschritten, Wassermelder, Fenster bei Kälte lange offen. |
 | [recorder/](recorder/) | Datenbank klein halten: Aufräumen ohne Repack, laute Sensoren nur wenige Tage behalten. |

@@ -6,6 +6,39 @@ kopiert hat, sieht so, ob sich daran etwas getan hat.
 Releases heißen nach Jahr, Monat und laufender Nummer (`2026.11.0`) und bündeln die Einträge seit dem letzten
 Release. Die Nummer sagt nichts über Kompatibilität: Die Ordner sind unabhängig voneinander.
 
+## Noch nicht in einem Release
+
+### 2026-11-19
+
+#### Neu
+
+- **home-assistant/heizung:** Die Regelung unterstützt Thermostate ohne Modus „Aus" (Shelly BLU TRV, kennt nur
+  „Heizen"): `heizung_raum_regeln` stellt sie zum Schließen auf ihre Mindesttemperatur, in den Zweigen „Aus"
+  und „Aus wiederholen" (`scripts_heizung.yaml`). Ein Raum kann mehrere Heizkörper haben: „Heizung: Büro 1"
+  ruft das Skript für einen zweiten Heizkörper ein zweites Mal auf, ohne den 2-Stunden-Timer
+  (`automations_heizung.yaml`).
+  Wer das Skript schon übernommen hat: beide Zweige nachziehen. Für Thermostate mit „Aus" ändert sich nichts.
+- **home-assistant/heizung:** Neue Automation „Heizung: Bad OG" für einen Raum ohne Raumthermostat: Der
+  Heizkörper regelt selbst, bei offenem Fenster wird er auf die Mindesttemperatur gestellt und bleibt zu, bis
+  jemand wieder aufdreht (`automations_heizung.yaml`, braucht weder Skript noch Helfer).
+- **home-assistant/heizung:** Neuer Raum „Heizung: Kinderzimmer" als Beispiel für einen Raum ohne
+  Fensterkontakt (`fenster: []`), mit Timer und Trend-Helfer (`helfer_heizung.yaml`) und Einträgen in „Soll
+  nach 2 h zurück aufs Programm" und „Raum wird trotz Aus wärmer". Die README hat dazu einen Abschnitt „Raum
+  ohne Raumthermostat" und einen Hinweis zum Bluetooth-Empfang der Shelly BLU TRV.
+- **home-assistant/heizung:** Neues optionales Skriptfeld `ist_sensor`: ein eigener Sensor für die
+  Raumtemperatur statt der des Raumthermostats, für Räume, in denen das Raumthermostat falsch misst (Zugluft,
+  Klimaanlage). „Heizung: Büro 1" nutzt dafür den Mittelwert aus zwei Fühlern (`sensor.raumtemperatur_buro_1`,
+  neu in `helfer_heizung.yaml`); der Trend-Helfer von Büro 1 hat diesen Sensor jetzt als Quelle.
+
+#### Behoben
+
+- **home-assistant/heizung:** „Raum wird trotz Aus wärmer" meldete auch Räume, die durch Geräte, eine
+  Klimaanlage oder eine offene Tür zum Nachbarraum wärmer wurden, obwohl der Heizkörper kalt war. Die Meldung
+  (`automations_heizung.yaml`) und „Aus wiederholen" über den Trend-Helfer (`scripts_heizung.yaml`) verlangen
+  jetzt zusätzlich, dass der Fühler am Heizkörper mindestens 0,3 °C über der Raumtemperatur liegt.
+  Einschränkung: Ein Ventil, das nur leicht durchlässt und den Fühler kaum erwärmt, wird so nicht gemeldet.
+  Wer die Dateien schon übernommen hat: Skript und Meldungs-Automation nachziehen.
+
 ## 2026.11.2 (2026-11-19)
 
 ### 2026-11-19

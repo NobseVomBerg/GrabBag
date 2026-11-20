@@ -1,16 +1,21 @@
-# Heizung: Heizkörperthermostate folgen einem Raumthermostat (Homematic / Homematic IP)
+# Heizung: Heizkörperthermostate folgen einem Raumthermostat (Homematic / Homematic IP, Shelly BLU TRV)
 # Aus https://github.com/NobseVomBerg/GrabBag - MIT-Lizenz, ohne Gewähr. Entity-IDs an die eigene Anlage anpassen.
 #
 # Automationen:
 #   - je Raum: Heizkörper folgt Soll/Ist des Wandthermostats (mit Hysterese), Fenster/Tür offen -> aus
+#     (Kinderzimmer: Raum ohne Fensterkontakt, die Fensterliste ist leer)
 #   - Soll nach 2 h zurück aufs Programm: manuelles Verstellen am Wandthermostat gilt nur 2 Stunden
 #   - Raum wird trotz Aus wärmer: Meldung aufs Handy, wenn ein Raum 30 min lang wärmer wird, obwohl sein
 #     Heizkörper aus ist (Ventil schließt nicht oder der Aus-Befehl kam nicht an)
+#   - Bad OG: Raum ohne Raumthermostat. Der Heizkörper regelt selbst; bei offenem Fenster wird er
+#     geschlossen und bleibt zu, bis jemand wieder aufdreht. Braucht weder Skript noch Helfer.
 #
 # Braucht:
 #   - script.heizung_raum_regeln aus scripts_heizung.yaml
 #   - je Raum ein Wandthermostat und ein Heizkörperthermostat (climate.*) sowie Fensterkontakte
 #   - Timer und Trend-Helfer (binary_sensor.raumtemperatur_*_steigt) aus helfer_heizung.yaml
+#   - für Büro 1 den Mittelwert-Sensor sensor.raumtemperatur_buro_1 aus helfer_heizung.yaml (Raumtemperatur
+#     aus zwei Fühlern; wer das nicht braucht, streicht ist_sensor und den Trigger auf den Sensor)
 #
 # Anpassen:
 #   - notify.mobile_app_DEIN_HANDY ist ein Platzhalter: den Meldedienst des eigenen Handys eintragen
@@ -101,10 +106,16 @@
     #1-#3) oder das Küchenfenster offen -> Heizkörper aus (der Durchgang zur Küche
     hat keine Tür). Vorübergehend - später kommt die Split-Klima (Hayer, 7,1 kW) dazu.
     Logik: script.heizung_raum_regeln. Der 2-h-Timer der manuellen Verstellung ruht,
-    solange ein Fenster oder eine Tür offen ist.'
+    solange ein Fenster oder eine Tür offen ist. Zweiter Heizkörper mit Shelly BLU
+    TRV (seit 19.11.2026) wird gleich geregelt; der 2-h-Timer hängt nur am ersten
+    Aufruf. Raumtemperatur ist der Mittelwert aus Wandthermostat und Airthings (sensor.raumtemperatur_buro_1),
+    weil die Klimaanlage ihre warme Luft aufs Wandthermostat bläst; der Sollwert kommt
+    weiter vom Wandthermostat.'
   triggers:
   - trigger: state
     entity_id: climate.wandth_eg_buro1
+  - trigger: state
+    entity_id: sensor.raumtemperatur_buro_1
   - trigger: state
     entity_id:
     - binary_sensor.fenster_eg_buro1_essecke
@@ -134,6 +145,20 @@
       - binary_sensor.fenster_eg_kuche
       timer: timer.buro_1_soll_zurucksetzen
       steigt: binary_sensor.raumtemperatur_buro_1_steigt
+      ist_sensor: sensor.raumtemperatur_buro_1
+  - alias: Zweiter Heizkörper (Shelly BLU TRV)
+    action: script.heizung_raum_regeln
+    data:
+      thermostat: climate.wandth_eg_buro1
+      heizkoerper: climate.heizth_eg_buro1_2
+      fenster:
+      - binary_sensor.fenster_eg_buro1_essecke
+      - binary_sensor.fenster_eg_buro1_1
+      - binary_sensor.fenster_eg_buro1_2
+      - binary_sensor.fenster_eg_buro1_3
+      - binary_sensor.fenster_eg_kuche
+      steigt: binary_sensor.raumtemperatur_buro_1_steigt
+      ist_sensor: sensor.raumtemperatur_buro_1
   mode: queued
   max: 3
 - id: heizung_buero_2
@@ -167,21 +192,49 @@
       steigt: binary_sensor.raumtemperatur_buro_2_steigt
   mode: queued
   max: 3
+- id: heizung_kinderzimmer
+  alias: 'Heizung: Kinderzimmer'
+  description: 'Heizkörper Kinderzimmer OG (Shelly BLU TRV) folgt dem Raumthermostat
+    (dessen Programm bzw. manueller Sollwert gilt, manuelle Änderungen nach 2 h zurück
+    aufs Programm). Das Kinderzimmer hat keinen Fensterkontakt, deshalb gibt es hier
+    keine Fenster-Abschaltung. Logik: script.heizung_raum_regeln.'
+  triggers:
+  - trigger: state
+    entity_id: climate.wandth_og_kinderz
+  - trigger: state
+    entity_id: timer.kinderzimmer_soll_zurucksetzen
+    to: active
+    note: '2-h-Timer gestartet: bei offenem Fenster gleich anhalten'
+  - trigger: time_pattern
+    minutes: /5
+  - trigger: homeassistant
+    event: start
+  conditions: []
+  actions:
+  - action: script.heizung_raum_regeln
+    data:
+      thermostat: climate.wandth_og_kinderz
+      heizkoerper: climate.heizth_og_kinderz
+      fenster: []
+      timer: timer.kinderzimmer_soll_zurucksetzen
+      steigt: binary_sensor.raumtemperatur_kinderzimmer_steigt
+  mode: queued
+  max: 3
 - id: heizung_soll_zuruecksetzen
   alias: 'Heizung: Soll nach 2 h zurück aufs Programm'
   description: 'Wird der Sollwert an einem der Raumthermostate (Wohnzimmer OG, Schlafzimmer
-    OG, Büro 1, Büro 2) vom Wert seines Wochenprogramms weg verstellt, startet dessen
-    2-Stunden-Timer (jede weitere Verstellung startet ihn neu); läuft er ab, geht
-    der Sollwert zurück auf den Programmwert zu diesem Zeitpunkt (aus schedule_data
-    des Thermostats; Wohnzimmer und Büros haben ein flaches Programm mit 18 °C, Schlafzimmer
-    P1 mit Nacht/Abend-Zeiten). Wechselt das Programm selbst den Sollwert, passt er
-    zum Programm und der Timer wird abgebrochen. Ohne lesbares Programm gilt 18 °C.
-    Kommt die Rückstellung nicht an (Thermostat nicht erreichbar oder Sollwert nach
-    2 min nicht übernommen), startet derselbe Timer mit 15 min und es wird erneut
-    versucht, bis es klappt. Die Timer überstehen HA-Neustarts. Weiterer Raum: Thermostat
-    + Timer in ''timer_von'' und in den Triggern ergänzen. Der Timer ruht, solange
-    im Raum ein Fenster oder eine Tür offen ist (script.heizung_raum_regeln hält ihn
-    an), damit die Verstellung nach dem Lüften noch volle 2 h gilt.'
+    OG, Kinderzimmer OG, Büro 1, Büro 2) vom Wert seines Wochenprogramms weg verstellt,
+    startet dessen 2-Stunden-Timer (jede weitere Verstellung startet ihn neu); läuft
+    er ab, geht der Sollwert zurück auf den Programmwert zu diesem Zeitpunkt (aus
+    schedule_data des Thermostats; Wohnzimmer und Büros haben ein flaches Programm
+    mit 18 °C, Schlafzimmer P1 mit Nacht/Abend-Zeiten). Wechselt das Programm selbst
+    den Sollwert, passt er zum Programm und der Timer wird abgebrochen. Ohne lesbares
+    Programm gilt 18 °C. Kommt die Rückstellung nicht an (Thermostat nicht erreichbar
+    oder Sollwert nach 2 min nicht übernommen), startet derselbe Timer mit 15 min
+    und es wird erneut versucht, bis es klappt. Die Timer überstehen HA-Neustarts.
+    Weiterer Raum: Thermostat + Timer in ''timer_von'' und in den Triggern ergänzen.
+    Der Timer ruht, solange im Raum ein Fenster oder eine Tür offen ist (script.heizung_raum_regeln
+    hält ihn an), damit die Verstellung nach dem Lüften noch volle 2 h gilt.'
   triggers:
   - trigger: state
     entity_id:
@@ -189,6 +242,7 @@
     - climate.wandth_og_schlafz
     - climate.wandth_eg_buro1
     - climate.wandth_eg_buro2
+    - climate.wandth_og_kinderz
     attribute: temperature
     id: verstellt
   - trigger: event
@@ -210,6 +264,11 @@
     event_type: timer.finished
     event_data:
       entity_id: timer.buro_2_soll_zurucksetzen
+    id: abgelaufen
+  - trigger: event
+    event_type: timer.finished
+    event_data:
+      entity_id: timer.kinderzimmer_soll_zurucksetzen
     id: abgelaufen
   conditions: []
   actions:
@@ -273,6 +332,7 @@
       climate.wandth_og_schlafz: timer.schlafzimmer_soll_zurucksetzen
       climate.wandth_eg_buro1: timer.buro_1_soll_zurucksetzen
       climate.wandth_eg_buro2: timer.buro_2_soll_zurucksetzen
+      climate.wandth_og_kinderz: timer.kinderzimmer_soll_zurucksetzen
     thermostat: '{% if trigger.id == ''verstellt'' %}{{ trigger.entity_id }}{% else
       %}{% for k, v in timer_von.items() if v == trigger.event.data.entity_id %}{{
       k }}{% endfor %}{% endif %}'
@@ -291,7 +351,11 @@
     1 °C über Soll liegt und es draußen unter 15 °C hat - dann schließt das Ventil
     nicht oder ein Aus-Befehl kam nicht an (19.11.2026: Schlafzimmer heizte von 00:00
     bis mittags auf 26 °C). Eine Meldung je Fehlerfall; script.heizung_raum_regeln
-    wiederholt parallel den Aus-Befehl. Weiterer Raum: Trigger und ''raeume'' ergänzen.'
+    wiederholt parallel den Aus-Befehl. Weiterer Raum: Trigger und ''raeume'' ergänzen.
+    Seit 19.11.2026 abends zusätzlich: Der Fühler am Heizkörper muss mindestens 0,3
+    °C über dem Raum liegen. Ohne das kamen Fehlmeldungen für Büro 1 und Büro 2, die
+    von Technik, Klimaanlage und offener Tür warm wurden, während die Heizkörper kalt
+    waren. Büro 1 nimmt als Raumtemperatur den Mittelwert sensor.raumtemperatur_buro_1.'
   triggers:
   - trigger: template
     value_template: '{{ is_state(''binary_sensor.raumtemperatur_wohnzimmer_steigt'',
@@ -299,7 +363,9 @@
       ''temperature'') | float(99) <= 5) and state_attr(''climate.wandth_og_wnz'',
       ''current_temperature'') | float(-99) >= state_attr(''climate.wandth_og_wnz'',
       ''temperature'') | float(99) + 1 and state_attr(''weather.forecast_home_assistant'',
-      ''temperature'') | float(99) < 15 }}'
+      ''temperature'') | float(99) < 15 and [state_attr(''climate.heizth_og_wohnz'',
+      ''current_temperature'') | float(-99)] | max >= state_attr(''climate.wandth_og_wnz'',
+      ''current_temperature'') | float(99) + 0.3 }}'
     for:
       minutes: 30
     id: Wohnzimmer
@@ -309,17 +375,22 @@
       ''temperature'') | float(99) <= 5) and state_attr(''climate.wandth_og_schlafz'',
       ''current_temperature'') | float(-99) >= state_attr(''climate.wandth_og_schlafz'',
       ''temperature'') | float(99) + 1 and state_attr(''weather.forecast_home_assistant'',
-      ''temperature'') | float(99) < 15 }}'
+      ''temperature'') | float(99) < 15 and [state_attr(''climate.heizth_og_schlafz'',
+      ''current_temperature'') | float(-99)] | max >= state_attr(''climate.wandth_og_schlafz'',
+      ''current_temperature'') | float(99) + 0.3 }}'
     for:
       minutes: 30
     id: Schlafzimmer
   - trigger: template
     value_template: '{{ is_state(''binary_sensor.raumtemperatur_buro_1_steigt'', ''on'')
       and (is_state(''climate.heizth_eg_buro1'', ''off'') or state_attr(''climate.heizth_eg_buro1'',
-      ''temperature'') | float(99) <= 5) and state_attr(''climate.wandth_eg_buro1'',
-      ''current_temperature'') | float(-99) >= state_attr(''climate.wandth_eg_buro1'',
-      ''temperature'') | float(99) + 1 and state_attr(''weather.forecast_home_assistant'',
-      ''temperature'') | float(99) < 15 }}'
+      ''temperature'') | float(99) <= 5) and states(''sensor.raumtemperatur_buro_1'')
+      | float(-99) >= state_attr(''climate.wandth_eg_buro1'', ''temperature'') |
+      float(99) + 1 and state_attr(''weather.forecast_home_assistant'', ''temperature'')
+      | float(99) < 15 and [state_attr(''climate.heizth_eg_buro1'', ''current_temperature'')
+      | float(-99), state_attr(''climate.heizth_eg_buro1_2'', ''current_temperature'')
+      | float(-99)] | max >= states(''sensor.raumtemperatur_buro_1'') | float(99)
+      + 0.3 }}'
     for:
       minutes: 30
     id: Büro 1
@@ -329,18 +400,34 @@
       ''temperature'') | float(99) <= 5) and state_attr(''climate.wandth_eg_buro2'',
       ''current_temperature'') | float(-99) >= state_attr(''climate.wandth_eg_buro2'',
       ''temperature'') | float(99) + 1 and state_attr(''weather.forecast_home_assistant'',
-      ''temperature'') | float(99) < 15 }}'
+      ''temperature'') | float(99) < 15 and [state_attr(''climate.heizth_eg_buro2'',
+      ''current_temperature'') | float(-99)] | max >= state_attr(''climate.wandth_eg_buro2'',
+      ''current_temperature'') | float(99) + 0.3 }}'
     for:
       minutes: 30
     id: Büro 2
+  - trigger: template
+    value_template: '{{ is_state(''binary_sensor.raumtemperatur_kinderzimmer_steigt'',
+      ''on'') and (is_state(''climate.heizth_og_kinderz'', ''off'') or state_attr(''climate.heizth_og_kinderz'',
+      ''temperature'') | float(99) <= 5) and state_attr(''climate.wandth_og_kinderz'',
+      ''current_temperature'') | float(-99) >= state_attr(''climate.wandth_og_kinderz'',
+      ''temperature'') | float(99) + 1 and state_attr(''weather.forecast_home_assistant'',
+      ''temperature'') | float(99) < 15 and [state_attr(''climate.heizth_og_kinderz'',
+      ''current_temperature'') | float(-99)] | max >= state_attr(''climate.wandth_og_kinderz'',
+      ''current_temperature'') | float(99) + 0.3 }}'
+    for:
+      minutes: 30
+    id: Kinderzimmer
   conditions: []
   actions:
   - action: notify.mobile_app_DEIN_HANDY
     data:
       title: 'Heizung: {{ trigger.id }} wird trotz Aus wärmer'
-      message: '{{ trigger.id }}: Raum {{ state_attr(raeume[trigger.id], ''current_temperature'')
-        }} °C bei Soll {{ state_attr(raeume[trigger.id], ''temperature'') }} °C, Heizkörper
-        steht auf Aus. Ventil prüfen (Stift fest?) oder Funk gestört.'
+      message: '{{ trigger.id }}: Raum {{ states(ist[trigger.id]) if trigger.id in
+        ist else state_attr(raeume[trigger.id], ''current_temperature'') }} °C bei
+        Soll {{ state_attr(raeume[trigger.id], ''temperature'') }} °C, Heizkörper
+        steht auf Aus, ist aber wärmer als der Raum. Ventil prüfen (Stift fest?) oder
+        Funk gestört.'
   mode: queued
   max: 4
   variables:
@@ -349,3 +436,46 @@
       Schlafzimmer: climate.wandth_og_schlafz
       Büro 1: climate.wandth_eg_buro1
       Büro 2: climate.wandth_eg_buro2
+      Kinderzimmer: climate.wandth_og_kinderz
+    ist:
+      Büro 1: sensor.raumtemperatur_buro_1
+- id: heizung_bad_og
+  alias: 'Heizung: Bad OG'
+  description: 'Bad OG hat kein Raumthermostat: der Heizkörper (Shelly BLU TRV) regelt
+    selbst nach seinem eingestellten Sollwert. Fenster offen -> Heizkörper zu (Mindesttemperatur
+    4 °C) und er bleibt zu, auch nach dem Schließen des Fensters, bis jemand wieder
+    aufdreht. Dreht jemand bei offenem Fenster auf, wird sofort wieder geschlossen;
+    zusätzlich alle 5 min geprüft, falls ein Befehl nicht ankam. Der Fensterkontakt
+    ''nicht erreichbar'' ändert nichts.'
+  triggers:
+  - trigger: state
+    entity_id: binary_sensor.fenster_og_bad
+    to: 'on'
+    id: auf
+  - trigger: state
+    entity_id: climate.heizth_og_bad
+    attribute: temperature
+    id: verstellt
+  - trigger: time_pattern
+    minutes: /5
+    id: pruefen
+  conditions:
+  - condition: state
+    entity_id: binary_sensor.fenster_og_bad
+    state: 'on'
+  - condition: template
+    alias: Heizkörper ist nicht zu
+    value_template: '{{ state_attr(''climate.heizth_og_bad'', ''temperature'') |
+      float(0) > state_attr(''climate.heizth_og_bad'', ''min_temp'') | float(4)
+      + 0.5 }}'
+  actions:
+  - action: climate.set_temperature
+    target:
+      entity_id: climate.heizth_og_bad
+    data:
+      temperature: '{{ state_attr(''climate.heizth_og_bad'', ''min_temp'') | float(4)
+        }}'
+    continue_on_error: true
+    alias: Heizkörper schließen
+  mode: queued
+  max: 5

@@ -6,7 +6,8 @@
 #
 # weather.forecast_home_assistant (Außentemperatur für "Ein wiederholen" und die Trend-Erkennung) durch die
 # eigene Wetter-Entität ersetzen; die 15 °C sind ein Vorschlag. Das Feld "steigt" ist optional: der
-# Trend-Helfer des Raums aus helfer_heizung.yaml. Das 15-Minuten-Raster der Wiederholungen setzt voraus, dass die
+# Trend-Helfer des Raums aus helfer_heizung.yaml. Ebenfalls optional ist "ist_sensor": ein eigener Sensor für
+# die Raumtemperatur, z. B. ein Mittelwert aus zwei Fühlern (helfer_heizung.yaml). Das 15-Minuten-Raster der Wiederholungen setzt voraus, dass die
 # Raum-Automationen alle 5 Minuten laufen (automations_heizung.yaml).
 #
 # Einbinden: in der UI je Skript neu anlegen, "In YAML bearbeiten" und den Inhalt unter dem Schlüssel
@@ -38,7 +39,14 @@ heizung_raum_regeln:
     der Raum trotz Aus wärmer wird (optionales Feld ''steigt'': Trend-Helfer der Raumtemperatur,
     mehr als 0,3 °C je Stunde) und es draußen unter 15 °C hat - am 19.11.2026 lag
     der Heizkörperfühler nur 0,7 °C über dem Raum, obwohl das Ventil offen stand.
-    Dazu meldet ''Heizung: Raum wird trotz Aus wärmer'' den Fall aufs Handy.'
+    Dazu meldet ''Heizung: Raum wird trotz Aus wärmer'' den Fall aufs Handy. Thermostate
+    ohne Modus ''Aus'' (Shelly BLU TRV, nur ''Heizen'') werden zum Schließen auf ihre
+    Mindesttemperatur gestellt (4 °C). Seit 19.11.2026 abends: Der Trend allein reicht
+    nicht - der Fühler am Heizkörper muss dabei mindestens 0,3 °C über dem Raum liegen,
+    sonst kommt die Wärme woanders her (Technik, offene Tür zum Nachbarraum, Klimaanlage).
+    Optional ''ist_sensor'': eigener Sensor für die Raumtemperatur statt der des Raumthermostats
+    (Büro 1: Mittelwert aus Wandthermostat und Airthings, weil die Klimaanlage das
+    Wandthermostat anbläst); fällt er aus, gilt wieder das Raumthermostat.'
   mode: parallel
   max: 4
   icon: mdi:radiator
@@ -74,9 +82,19 @@ heizung_raum_regeln:
       selector:
         entity:
           domain: binary_sensor
+    ist_sensor:
+      name: Eigener Sensor für die Raumtemperatur
+      description: 'Optional: ersetzt die Ist-Temperatur des Raumthermostats, z. B.
+        ein Mittelwert aus mehreren Fühlern'
+      required: false
+      selector:
+        entity:
+          domain: sensor
   sequence:
   - variables:
-      ist: '{{ state_attr(thermostat, ''current_temperature'') }}'
+      ist: '{{ states(ist_sensor) if (ist_sensor is defined and ist_sensor | length
+        > 0 and is_number(states(ist_sensor))) else state_attr(thermostat, ''current_temperature'')
+        }}'
       soll: '{{ state_attr(thermostat, ''temperature'') | float(0) }}'
       offen: '{{ fenster | select(''is_state'', ''on'') | list | count > 0 }}'
       hk_soll: '{{ state_attr(heizkoerper, ''temperature'') | float(0) }}'
@@ -130,11 +148,26 @@ heizung_raum_regeln:
       - condition: template
         value_template: '{{ not heizen and not hk_zu }}'
       sequence:
-      - action: climate.set_hvac_mode
-        target:
-          entity_id: '{{ heizkoerper }}'
-        data:
-          hvac_mode: 'off'
+      - if:
+        - condition: template
+          alias: Thermostat kennt 'Aus'
+          value_template: '{{ ''off'' in (state_attr(heizkoerper, ''hvac_modes'')
+            or []) }}'
+        then:
+        - action: climate.set_hvac_mode
+          target:
+            entity_id: '{{ heizkoerper }}'
+          data:
+            hvac_mode: 'off'
+          continue_on_error: true
+        else:
+        - alias: 'Ohne ''Aus'' (Shelly BLU TRV): auf die Mindesttemperatur'
+          action: climate.set_temperature
+          target:
+            entity_id: '{{ heizkoerper }}'
+          data:
+            temperature: '{{ state_attr(heizkoerper, ''min_temp'') | float(5) }}'
+          continue_on_error: true
     - alias: Aus wiederholen (Heizkörper heizt trotz Aus weiter)
       conditions:
       - condition: template
@@ -143,14 +176,30 @@ heizung_raum_regeln:
           ''current_temperature'')) and state_attr(heizkoerper, ''current_temperature'')
           | float >= ist | float + 0.8) or (steigt is defined and steigt | length
           > 0 and is_state(steigt, ''on'') and state_attr(''weather.forecast_home_assistant'',
-          ''temperature'') | float(99) < 15)) }}'
+          ''temperature'') | float(99) < 15 and is_number(state_attr(heizkoerper,
+          ''current_temperature'')) and state_attr(heizkoerper, ''current_temperature'')
+          | float >= ist | float + 0.3)) }}'
       sequence:
-      - action: climate.set_hvac_mode
-        target:
-          entity_id: '{{ heizkoerper }}'
-        data:
-          hvac_mode: 'off'
-        continue_on_error: true
+      - if:
+        - condition: template
+          alias: Thermostat kennt 'Aus'
+          value_template: '{{ ''off'' in (state_attr(heizkoerper, ''hvac_modes'')
+            or []) }}'
+        then:
+        - action: climate.set_hvac_mode
+          target:
+            entity_id: '{{ heizkoerper }}'
+          data:
+            hvac_mode: 'off'
+          continue_on_error: true
+        else:
+        - alias: 'Ohne ''Aus'' (Shelly BLU TRV): auf die Mindesttemperatur'
+          action: climate.set_temperature
+          target:
+            entity_id: '{{ heizkoerper }}'
+          data:
+            temperature: '{{ state_attr(heizkoerper, ''min_temp'') | float(5) }}'
+          continue_on_error: true
     - alias: Ein wiederholen (Heizkörper bleibt trotz Heizen kalt)
       conditions:
       - condition: template
