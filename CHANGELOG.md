@@ -6,7 +6,7 @@ kopiert hat, sieht so, ob sich daran etwas getan hat.
 Releases heißen nach Jahr, Monat und laufender Nummer (`2026.11.0`) und bündeln die Einträge seit dem letzten
 Release. Die Nummer sagt nichts über Kompatibilität: Die Ordner sind unabhängig voneinander.
 
-## Noch nicht in einem Release
+## 2026.11.3 (2026-11-21)
 
 ### 2026-11-19
 
